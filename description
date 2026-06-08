@@ -1,0 +1,22 @@
+Very simple compiled programming language
+
+Name - Undecided
+
+GOALS:
+    - Addition parser and tokenizer libraries
+        - STB-style?
+    - Register optimization pass?
+        - My previous compiled languages didn't really have this
+    - NO chance of memory leaks
+        - I usually don't check every scenario because I'm more interested in the code, but no matter how long this takes, this programming language needs to be memory-safe.
+
+Maybe README.md format coming up soon?
+    I'm still pretty new to READMEs, might take some time
+
+HOW IT WORKS (more will be added as I develop this language):
+    - Tokenizer library
+        - Maybe add macros for creating the tokenizer?
+        - There might be some drawbacks to using macros in approach, but I want to support as diverse of a range for programming languages as possible
+    - Parser / AST library
+        - Might be the hardest one: there are a lot of programming styles for ASTS
+            - I'm probably going to compromise and make it work on some minimal styles -- I might add more later, but for now, that could do

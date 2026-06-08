@@ -1,0 +1,1 @@
+rm ./exes/main
