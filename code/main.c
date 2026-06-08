@@ -7,9 +7,16 @@
  *
 */
 
-#include <stdio.h>
+#define STB_LANG_ERROR_IMPLEMENTATION
 
-int main(){
+
+#include <stdio.h>
+#include "../libraries/error/error.h"
+#include "../libraries/tokenizer/tokenizer.h"
+#include "../libraries/parser/parser.h"
+
+int main(int argc, char **argv){
+    stb_lang_tokenizer_init("examples/a.lang");
     printf("Hello World\n");
     return 0;
 }
