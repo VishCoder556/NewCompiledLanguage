@@ -3,12 +3,13 @@ Very simple compiled programming language
 Name - Undecided
 
 GOALS:
-    - Addition parser and tokenizer libraries
+    - Parser and tokenizer libraries
         - STB-style?
     - Register optimization pass?
         - My previous compiled languages didn't really have this
     - NO chance of memory leaks
         - I usually don't check every scenario because I'm more interested in the code, but no matter how long this takes, this programming language needs to be memory-safe.
+            - UPDATE: This current version certainly compromises memory-wise, there are a bunch of memory leak spots, but I'll make it work and then make it work safely
 
 Maybe README.md format coming up soon?
     I'm still pretty new to READMEs, might take some time
