@@ -26,7 +26,7 @@ int stb_lang_tokenizer_get_length(FILE *file){
 #define STB_LANG_ADD_TOKEN(...) STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer->tokens, (STB_CONCAT(CUR_TOKENIZER_NAME, _Token)){__VA_ARGS__});
 
 #define STB_LANG_TOKEN_CHAR(ch, tkn) case ch: \
-    STB_LANG_ADD_TOKEN(.type = tkn, .value=NULL); STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer); break;
+    STB_LANG_ADD_TOKEN(.type = tkn, .value=NULL); break;
 #define STB_LANG_SIMPLE_CASES(...) __VA_ARGS__
 #define STB_LANG_ALPHA(typ, ...) \
     if (isalpha(c)) { \
@@ -38,10 +38,10 @@ int stb_lang_tokenizer_get_length(FILE *file){
                 val = realloc(val, valcap); \
             } \
             val[vallen++] = c; \
-            STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer); \
+            if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer) == -1) {break;}; \
             c = tokenizer->file.contents[tokenizer->cursor]; \
         } \
-        val[vallen++] = '\0'; \
+        val[vallen++] = '\0'; tokenizer->cursor--; \
         STB_LANG_ADD_TOKEN(.type = typ, .value=val); break; \
     }
 #define STB_LANG_NUM(typ, ...) \
@@ -54,10 +54,10 @@ int stb_lang_tokenizer_get_length(FILE *file){
                 val = realloc(val, valcap); \
             } \
             val[vallen++] = c; \
-            STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer); \
+            if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer) == -1){break;}; \
             c = tokenizer->file.contents[tokenizer->cursor]; \
         } \
-        val[vallen++] = '\0'; \
+        val[vallen++] = '\0'; tokenizer->cursor--; \
         STB_LANG_ADD_TOKEN(.type = typ, .value=val); break; \
     }
 #define STB_LANG_SKIP(ch) case ch: \
@@ -67,7 +67,6 @@ int stb_lang_tokenizer_get_length(FILE *file){
 // For later on
 #define STB_LANG_INVOKE_TYPENEW(tkn) dymarray_typenew(tkn, 20, 10)
 
-#define CUR_TOKENIZER_PREFIX lang_tokenizer
 #define STB_LANG_NEW_TOKENIZER(atokens, _cases, ...) \
 typedef enum { \
     atokens \

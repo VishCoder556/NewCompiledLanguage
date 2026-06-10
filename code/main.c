@@ -22,6 +22,7 @@ char *HELP = "New Programming Language HELP Manual\n\t"
 
 
 #define CUR_TOKENIZER_NAME Lang_Tokenizer
+#define CUR_TOKENIZER_PREFIX lang_tokenizer
 
 STB_LANG_NEW_TOKENIZER( 
     STB_LANG_TOKENS(
@@ -45,6 +46,21 @@ STB_LANG_NEW_TOKENIZER(
     STB_LANG_SKIP(' ')
 )
 
+
+#define CUR_PARSER_NAME Lang_Parser
+#define CUR_PARSER_PREFIX lang_parser
+
+STB_LANG_NEW_PARSER(
+    STB_LANG_ASTS(
+        AST_FUNCDEF
+    ),
+    STB_LANG_PARSE_BODY(
+        STB_LANG_MATCH_VALUE(TOKEN_ID, "func", {
+            printf("FOUND KEYWORD \"%s\"\n", token.value);
+        })
+    )
+)
+
 int main(int argc, char **argv){
     char *input_file = NULL;
     for (int i=1; i<argc; i++){
@@ -63,9 +79,12 @@ int main(int argc, char **argv){
     Lang_Tokenizer *tokenizer = lang_tokenizer_init("examples/a.lang");
     while (lang_tokenizer_token(tokenizer) == 0){
     }
-    int len = tokenizer->tokens.datalen;
-    for (int i=0; i<len; i++){
-        printf("%d\n", tokenizer->tokens.data[i].type);
+    // int len = tokenizer->tokens.datalen;
+    // for (int i=0; i<len; i++){
+    //     printf("%d\n", tokenizer->tokens.data[i].type);
+    // }
+    Lang_Parser *parser = lang_parser_init(tokenizer);
+    while (lang_parser_parse_body(parser) == 0){
     }
     return 0;
 }
