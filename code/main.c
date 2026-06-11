@@ -31,13 +31,15 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_LB,
         TOKEN_RB,
         TOKEN_ID,
-        TOKEN_NUM
+        TOKEN_NUM,
+        TOKEN_COMMA
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
         STB_LANG_TOKEN_CHAR(')', TOKEN_RP)
         STB_LANG_TOKEN_CHAR('{', TOKEN_LB)
         STB_LANG_TOKEN_CHAR('}', TOKEN_RB)
+        STB_LANG_TOKEN_CHAR(',', TOKEN_COMMA)
 
         STB_LANG_SKIP('\n')
     ),
@@ -52,16 +54,32 @@ STB_LANG_NEW_TOKENIZER(
 
 STB_LANG_NEW_PARSER(
     STB_LANG_ASTS(
-        AST_FUNCDEF
+        AST_FUNCDEF,
+        AST_VAR
     ),
     STB_LANG_PARSE_BODY(
-        STB_LANG_MATCH_VALUE(TOKEN_ID, "func", {
-            printf("FOUND KEYWORD \"%s\"\n", token.value);
-        })
+        STB_LANG_MATCH_VALUE(TOKEN_ID, "func", 
+            STB_LANG_IF_TOKEN(TOKEN_ID, // Function name
+                STB_LANG_SAVE(func_name, match_token);
+                STB_LANG_PARSE_EXPR_LIST(params, TOKEN_LP, TOKEN_COMMA, TOKEN_RP)
+                STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
+                return STB_LANG_AST_FUNCDEF(AST_FUNCDEF, func_name, params, stmnts)
+            )
+        )
+    ),
+    STB_LANG_PARSE_AST(
+        // No ASTS yet!
+        return (Lang_Parser_AST){0};
+    ),
+    STB_LANG_PARSE_EXPR(
+        STB_LANG_MATCH_TOKEN(TOKEN_ID,  
+            return STB_LANG_AST_LITERAL(AST_VAR, match_token);
+        )
     )
 )
 
 int main(int argc, char **argv){
+
     char *input_file = NULL;
     for (int i=1; i<argc; i++){
         char *str = argv[i];
@@ -86,5 +104,8 @@ int main(int argc, char **argv){
     Lang_Parser *parser = lang_parser_init(tokenizer);
     while (lang_parser_parse_body(parser) == 0){
     }
+    Lang_Parser_AST *ast = GetLinkedListHead((*parser), Lang_Parser_AST);
+    Lang_Parser_AST *left = (Lang_Parser_AST*)ast->left;
+    printf("%s, %s\n", left->value, ((Lang_Parser_AST*)left->next)->value);
     return 0;
 }

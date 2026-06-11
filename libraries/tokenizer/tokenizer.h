@@ -23,7 +23,7 @@ int stb_lang_tokenizer_get_length(FILE *file){
     return a;
 }
 
-#define STB_LANG_ADD_TOKEN(...) STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer->tokens, (STB_CONCAT(CUR_TOKENIZER_NAME, _Token)){__VA_ARGS__});
+#define STB_LANG_ADD_TOKEN(...) STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer->tokens, (STB_CONCAT(CUR_TOKENIZER_NAME, _Token)){__VA_ARGS__, .offset=tokenizer->cursor});
 
 #define STB_LANG_TOKEN_CHAR(ch, tkn) case ch: \
     STB_LANG_ADD_TOKEN(.type = tkn, .value=NULL); break;
@@ -60,8 +60,7 @@ int stb_lang_tokenizer_get_length(FILE *file){
         val[vallen++] = '\0'; tokenizer->cursor--; \
         STB_LANG_ADD_TOKEN(.type = typ, .value=val); break; \
     }
-#define STB_LANG_SKIP(ch) case ch: \
-    tokenizer->cursor++; break;
+#define STB_LANG_SKIP(ch) case ch: break;
 #define STB_LANG_TOKENS(...) __VA_ARGS__
 
 // For later on
@@ -74,6 +73,7 @@ typedef enum { \
 typedef struct { \
     STB_CONCAT(CUR_TOKENIZER_NAME, _TokenType) type; \
     char *value; \
+    int offset; \
 }STB_CONCAT(CUR_TOKENIZER_NAME, _Token); \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TOKENIZER_NAME, _Token)) \
 \

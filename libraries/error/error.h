@@ -21,6 +21,7 @@ void stb_lang_error_major_global(char *type, char *fmt, ...){
         printf("\x1b[1;31m%s\x1b[0m: %s\n", "ErrorGeneratorError", "Not enough space to genereate errors");
         exit(-1);
     }
+
     int n = vsnprintf(add, addcap, fmt, args);
 
     if (n > addcap){
@@ -30,7 +31,7 @@ void stb_lang_error_major_global(char *type, char *fmt, ...){
             printf("\x1b[1;31m%s\x1b[0m: %s\n", "ErrorGeneratorError", "Not enough space to genereate errors");
             exit(-1);
         }
-        snprintf(add, sizeof(add), fmt, args);
+        snprintf(add, n, fmt, args);
     }
     va_end(args);
 
