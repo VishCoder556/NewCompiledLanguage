@@ -10,7 +10,7 @@
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 5)
 
 #define STB_LANG_IR_EMIT(typ, des, sr) \
-STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .str=sr, .dest=des})
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .src=sr, .dest=des})
 
 
 #define STB_LANG_IR_BLOCK() do {\
@@ -50,7 +50,7 @@ STB_LANG_IR_EMIT(code, ast->value, STB_LANG_IR_RHS())
 typedef enum{types}STB_CONCAT(CUR_IR_NAME, _InstrType); \
 typedef struct { \
     STB_CONCAT(CUR_IR_NAME, _InstrType) type; \
-    char *str; \
+    char *src; \
     char *dest; \
 }STB_CONCAT(CUR_IR_NAME, _Instr); \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_IR_NAME, _Instr));\
@@ -58,12 +58,14 @@ typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *head; \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *tail; \
     STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr) instrs; \
+    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table; \
 }CUR_IR_NAME; \
 CUR_IR_NAME *STB_CONCAT(CUR_IR_PREFIX, _init)(CUR_TYPEINFO_NAME *checker){ \
     CUR_IR_NAME *ir = malloc(sizeof(*ir)); \
     ir->head = checker->head; \
     ir->tail = ir->head; \
     ir->instrs = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _new)(); \
+    ir->symbol_table = checker->symbol_table; \
     return ir; \
 } \
 char *STB_CONCAT(CUR_IR_PREFIX, _ast)(CUR_IR_NAME *ir, STB_CONCAT(CUR_PARSER_NAME, _AST) *ast){ \

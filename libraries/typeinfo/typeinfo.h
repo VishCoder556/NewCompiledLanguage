@@ -22,7 +22,7 @@
 #define STB_LANG_SYMBOL(ast) STB_LANG_REGISTER_SYMBOL(ast->value, ast->typeinfo)
 
 #define STB_LANG_INFER_TYPE(nam) \
-STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(checker, nam); \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(checker->symbol_table, nam, NULL); \
 if (symbol.typeinfo != -1) {ast->typeinfo = symbol.typeinfo;}
 
 #define STB_LANG_NEW_TYPEINFO(...) \
@@ -38,17 +38,21 @@ typedef struct { \
     STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table; \
     int cursor; \
 }CUR_TYPEINFO_NAME; \
-STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(CUR_TYPEINFO_NAME *checker, char *query){ \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table, char *query, int *idx){ \
     if (query == NULL) {goto exit;} \
-    for (int i=0; i<checker->symbol_table.datalen; i++){\
-        STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = checker->symbol_table.data[i]; \
+    for (int i=0; i<symbol_table.datalen; i++){\
+        STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = symbol_table.data[i]; \
         if (symbol.name != NULL){ \
             if (strcmp(symbol.name, query) == 0){ \
+                if (idx != NULL) \
+                    *idx = i; \
                 return symbol; \
             }; \
         } \
     }; \
 exit: \
+    if (idx != NULL) \
+        *idx = -1; \
     return (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.typeinfo = STB_LANG_AST_TYPE_NONE}; \
 } \
 CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parser) { \
@@ -105,5 +109,10 @@ STB_LANG_INFER_TYPE(ast->value); \
 STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
 STB_LANG_SYMBOL(ast);
 
+#define STB_LANG_DECL() \
+STB_LANG_EXPAND_RHS(); \
+STB_LANG_INFER_TYPE(ast->value); \
+STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
+STB_LANG_SYMBOL(ast);
 
 #endif

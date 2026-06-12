@@ -144,6 +144,15 @@ int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_type)(char *string){ \
     return -1; \
 }
 
+#define STB_LANG_TYPEINFO_SIZE(...) \
+int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(int typeinf){ \
+    if (typeinf == -1) return -1; \
+    __VA_ARGS__; \
+    return -1; \
+}
+
+#define STB_LANG_MATCH_TYPEINFO_SIZE(typeinfo, size) if(typeinf==typeinfo) {return size;}
+
 #define STB_LANG_DEFINE_TYPEINFO(...) \
 typedef enum { \
     STB_LANG_AST_TYPE_NONE = -1, \
@@ -163,11 +172,11 @@ typedef enum { \
     _n; \
 })
 
-#define STB_LANG_AST_ASSIGN(typ, typeinfo, name, eqs) \
+#define STB_LANG_AST_ASSIGN_DECL(assign, decl, typeinfo, name, eqs) \
 ({ \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
     _n->typeinfo = typeinfo; \
-    _n->type = typ; \
+    _n->type = typeinfo == -1 ? assign : decl; \
     _n->value = name.value; \
     _n->left = NULL; \
     _n->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)eqs; \

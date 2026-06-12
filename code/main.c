@@ -18,6 +18,7 @@
 #include "../libraries/parser/parser.h"
 #include "../libraries/typeinfo/typeinfo.h"
 #include "../libraries/ir/ir.h"
+#include "../libraries/codegen/codegen.h"
 
 char *HELP = "New Programming Language HELP Manual\n\t"
 "-help: creates this page\n";
@@ -64,6 +65,10 @@ STB_LANG_TYPEINFO(
     STB_LANG_MATCH_TYPEINFO("void", AST_TYPE_VOID)
     STB_LANG_MATCH_TYPEINFO("int", AST_TYPE_INT)
 )
+STB_LANG_TYPEINFO_SIZE(
+    STB_LANG_MATCH_TYPEINFO_SIZE(AST_TYPE_VOID, 0)
+    STB_LANG_MATCH_TYPEINFO_SIZE(AST_TYPE_INT, 8)
+)
 
 
 
@@ -76,7 +81,8 @@ STB_LANG_ASTS(
     AST_FUNCDEF,
     AST_VAR,
     AST_INT,
-    AST_ASSIGN
+    AST_ASSIGN,
+    AST_DECL
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_MATCH_TOKEN(TOKEN_ID, 
@@ -100,7 +106,7 @@ STB_LANG_PARSE_AST(
             STB_LANG_SAVE(varia, match_token)
             STB_LANG_IF_TOKEN(TOKEN_EQ,
                 STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser));
-                return STB_LANG_AST_ASSIGN(AST_ASSIGN, typeinfo, varia, assign);
+                return STB_LANG_AST_ASSIGN_DECL(AST_ASSIGN, AST_DECL, typeinfo, varia, assign);
             )
         )
     }else {
@@ -125,6 +131,9 @@ STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_ASSIGN){
         STB_LANG_ASSIGN()
     }
+    STB_LANG_TYPEINFO_CASE(AST_DECL){
+        STB_LANG_DECL()
+    }
     STB_LANG_TYPEINFO_CASE(AST_INT){
         STB_LANG_ASSUME_TYPE(AST_TYPE_INT);
     }
@@ -138,6 +147,7 @@ STB_LANG_NEW_IR(
         IR_FUNCDEF_BEGIN,
         IR_FUNCDEF_END,
         IR_ASSIGN,
+        IR_DECL,
         IR_POP, // pop the stack
         IR_PUSH // push the stack (for later on, not used yet)
     ),
@@ -148,11 +158,34 @@ STB_LANG_NEW_IR(
         STB_LANG_IR_CASE(AST_ASSIGN,
             STB_LANG_IR_ASSIGN(IR_ASSIGN);
         )
+        STB_LANG_IR_CASE(AST_DECL,
+            STB_LANG_IR_ASSIGN(IR_DECL);
+        )
         STB_LANG_IR_CASE(AST_INT,
             STB_LANG_IR_RETURN_SELF();
         )
     )
 );
+
+#define CUR_CODEGEN_NAME Lang_CodeGen
+#define CUR_CODEGEN_PREFIX lang_codegen
+STB_LANG_NEW_CODEGEN(
+STB_LANG_CODEGEN_LIST(
+    STB_LANG_CODEGEN_CASE(IR_FUNCDEF_BEGIN,
+        STB_LANG_ARM_PROLOGUE()
+    )
+    STB_LANG_CODEGEN_CASE(IR_ASSIGN,
+        STB_LANG_ARM_ASSIGN();
+    )
+    STB_LANG_CODEGEN_CASE(IR_DECL,
+        STB_LANG_ARM_DECLARE();
+    )
+    STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
+        STB_LANG_ARM_EPILOGUE()
+    )
+)
+);
+
 
 int main(int argc, char **argv){
 
@@ -196,5 +229,11 @@ int main(int argc, char **argv){
     Lang_IR *ir = lang_ir_init(typeinfo);
     while (lang_ir_translate(ir) == 0){
     }
+
+    Lang_CodeGen *gen = lang_codegen_init(ir);
+    while (lang_codegen_ir(gen) == 0){
+    }
+    printf("-------- ASSEMBLY CODE --------\n");
+    printf("%s\n", gen->code.data);
     return 0;
 }

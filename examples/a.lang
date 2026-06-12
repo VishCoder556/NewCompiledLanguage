@@ -1,4 +1,4 @@
-int main(int thing){
+int main(){
     int a = 300;
-    a = 5
+    int b = 5
 }
