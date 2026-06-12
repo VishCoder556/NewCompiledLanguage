@@ -188,10 +188,10 @@ int main(int argc, char **argv){
     // printf("%s\n", left->value);
 
 
-    free(parser);
     Lang_TypeInfo *typeinfo = lang_typeinfo_init(parser);
     while (lang_typeinfo_check(typeinfo) == 0){
     }
+    free(parser);
 
     Lang_IR *ir = lang_ir_init(typeinfo);
     while (lang_ir_translate(ir) == 0){
