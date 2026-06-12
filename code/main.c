@@ -17,6 +17,7 @@
 #include "../libraries/tokenizer/tokenizer.h"
 #include "../libraries/parser/parser.h"
 #include "../libraries/typeinfo/typeinfo.h"
+#include "../libraries/ir/ir.h"
 
 char *HELP = "New Programming Language HELP Manual\n\t"
 "-help: creates this page\n";
@@ -127,8 +128,29 @@ STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_INT){
         STB_LANG_ASSUME_TYPE(AST_TYPE_INT);
     }
-
 )
+
+#define CUR_IR_NAME Lang_IR
+#define CUR_IR_PREFIX lang_ir
+
+STB_LANG_NEW_IR(
+    STB_LANG_IR_INSTRS(
+        IR_FUNCDEF_BEGIN,
+        IR_FUNCDEF_END,
+        IR_ASSIGN,
+    ),
+    STB_LANG_IR_CASES(
+        STB_LANG_IR_CASE(AST_FUNCDEF,
+            STB_LANG_IR_FUNCDEF()
+        )
+        STB_LANG_IR_CASE(AST_ASSIGN,
+            STB_LANG_IR_ASSIGN();
+        )
+        STB_LANG_IR_CASE(AST_INT,
+            STB_LANG_IR_RETURN_SELF();
+        )
+    )
+);
 
 int main(int argc, char **argv){
 
@@ -164,9 +186,13 @@ int main(int argc, char **argv){
     // printf("%s\n", left->value);
 
 
+    free(parser);
     Lang_TypeInfo *typeinfo = lang_typeinfo_init(parser);
     while (lang_typeinfo_check(typeinfo) == 0){
     }
-    // printf("Hi\n");
+
+    Lang_IR *ir = lang_ir_init(typeinfo);
+    while (lang_ir_translate(ir) == 0){
+    }
     return 0;
 }
