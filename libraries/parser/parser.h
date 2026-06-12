@@ -149,9 +149,6 @@ typedef enum { \
     STB_LANG_AST_TYPE_NONE = -1, \
     __VA_ARGS__ \
 }STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo);
-
-
-
 // ^ some typeinfo stuff for the user
 
 #define STB_LANG_AST_LITERAL(typ, token) \

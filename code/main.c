@@ -138,13 +138,15 @@ STB_LANG_NEW_IR(
         IR_FUNCDEF_BEGIN,
         IR_FUNCDEF_END,
         IR_ASSIGN,
+        IR_POP, // pop the stack
+        IR_PUSH // push the stack (for later on, not used yet)
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
-            STB_LANG_IR_FUNCDEF()
+            STB_LANG_IR_FUNCDEF(IR_FUNCDEF_BEGIN, IR_POP, IR_FUNCDEF_END)
         )
         STB_LANG_IR_CASE(AST_ASSIGN,
-            STB_LANG_IR_ASSIGN();
+            STB_LANG_IR_ASSIGN(IR_ASSIGN);
         )
         STB_LANG_IR_CASE(AST_INT,
             STB_LANG_IR_RETURN_SELF();

@@ -20,18 +20,30 @@ while (_block != NULL){ \
     _block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_block->next; \
 }}while(0);
 
+#define STB_LANG_IR_PARAMS(pop) do {\
+STB_CONCAT(CUR_PARSER_NAME, _AST) *_args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
+while (_args != NULL){ \
+    if (_args->type == STB_LANG_AST_TYPEINFO){ \
+        STB_LANG_IR_EMIT(pop, _args->value, NULL); \
+    } \
+    _args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_args->next; \
+}}while(0);
+// ^ popping from function args stack
+// no function call implemented yet, we won't have to worry about pushing
+
 
 #define STB_LANG_IR_RHS() STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, STB_LANG_RHS(ast))
 
 #define STB_LANG_IR_RETURN_SELF() return ast->value;
 
-#define STB_LANG_IR_FUNCDEF() \
-STB_LANG_IR_EMIT(IR_FUNCDEF_BEGIN, ast->value, NULL); \
+#define STB_LANG_IR_FUNCDEF(begin, pop, end) \
+STB_LANG_IR_EMIT(begin, ast->value, NULL); \
+STB_LANG_IR_PARAMS(pop) \
 STB_LANG_IR_BLOCK() \
-STB_LANG_IR_EMIT(IR_FUNCDEF_END, ast->value, NULL);
+STB_LANG_IR_EMIT(end, ast->value, NULL);
 
-#define STB_LANG_IR_ASSIGN()\
-STB_LANG_IR_EMIT(IR_ASSIGN, ast->value, STB_LANG_IR_RHS())
+#define STB_LANG_IR_ASSIGN(code)\
+STB_LANG_IR_EMIT(code, ast->value, STB_LANG_IR_RHS())
 
 
 #define STB_LANG_NEW_IR(types, cases) \
