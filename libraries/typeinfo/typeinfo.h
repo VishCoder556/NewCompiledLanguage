@@ -17,9 +17,9 @@
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 3)
 
-#define STB_LANG_REGISTER_SYMBOL(nam, typeinf) if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(checker->symbol_table), (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.name=nam, .typeinfo=typeinf});}
+#define STB_LANG_REGISTER_SYMBOL(nam, typeinf) do {if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(checker->symbol_table), (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.name=nam, .typeinfo=typeinf});}}while(0);
 
-#define STB_LANG_SYMBOL() STB_LANG_REGISTER_SYMBOL(ast->value, ast->typeinfo)
+#define STB_LANG_SYMBOL(ast) STB_LANG_REGISTER_SYMBOL(ast->value, ast->typeinfo)
 
 #define STB_LANG_INFER_TYPE(nam) \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(checker, nam); \
@@ -70,6 +70,12 @@ char STB_CONCAT(CUR_TYPEINFO_PREFIX, _check)(CUR_TYPEINFO_NAME *checker) { \
     return (checker->tail == NULL) ? -1 : 0; \
 }
 
+#define STB_LANG_EXPAND_PARAMS() do {\
+STB_CONCAT(CUR_PARSER_NAME, _AST) *_params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
+while (_params != NULL){ \
+    STB_LANG_SYMBOL(_params); \
+    _params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_params->next; \
+}}while(0);
 #define STB_LANG_EXPAND_BLOCK() do {\
 STB_CONCAT(CUR_PARSER_NAME, _AST) *_block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->right; \
 while (_block != NULL){ \
@@ -97,7 +103,7 @@ stb_lang_error_major_global("TypeinfoError", "Expected types to be equal"); \
 STB_LANG_EXPAND_RHS(); \
 STB_LANG_INFER_TYPE(ast->value); \
 STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
-STB_LANG_SYMBOL();
+STB_LANG_SYMBOL(ast);
 
 
 #endif
