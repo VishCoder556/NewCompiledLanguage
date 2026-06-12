@@ -2,6 +2,9 @@
  * Yes, there's documentation for this library and not the tokenizer library.
  * This library is going to be a bit more complicated so it needs some planning
 */
+
+#ifndef STB_LANG_PARSER_H
+#define STB_LANG_PARSER_H
 #include <stdio.h>
 #include <stdlib.h>
 #include "../linkedlist/linkedlist.h"
@@ -26,8 +29,8 @@
 #define STB_LANG_PARSER_UPDATE() token = parser->tokens.data[parser->cursor];
 #define STB_LANG_PARSER_PEEK(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _peek)(parser) == -1){stb_lang_error_major_global("OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
 
-#define STB_LANG_MATCH_TOKEN(type, ...) case type: match_token = token; STB_LANG_PARSER_PEEK();__VA_ARGS__; break;
-#define STB_LANG_MATCH_VALUE(typ, val, ...) case typ: \
+#define STB_LANG_MATCH_TOKEN(typ, ...) else if (token.type == typ) {match_token = token; STB_LANG_PARSER_PEEK();__VA_ARGS__;}
+#define STB_LANG_MATCH_VALUE(typ, val, ...) else if(token.type == typ) \
 { \
     if (strcmp(token.value, val) == 0){\
         match_token = token; STB_LANG_PARSER_PEEK();__VA_ARGS__; \
@@ -41,6 +44,7 @@ break; \
 #define STB_LANG_IF_TOKEN(typ, ...) if (token.type == typ) {match_token = token; STB_LANG_PARSER_PEEK();__VA_ARGS__;}
 #define STB_LANG_IF_VALUE(typ, val, ...) if (token.type == typ) {if (strcmp(token.value, val) == 0){match_token = token;STB_LANG_PARSER_PEEK();__VA_ARGS__;};}
 
+#define STB_LANG_ELSE(...) else{__VA_ARGS__;}
 
 
 // STB_LANG_EXPECT_TOKEN: yes, the error messages are bland and weird, this is a TODO for later
@@ -89,45 +93,36 @@ char STB_CONCAT(CUR_PARSER_PREFIX, _peek)(CUR_PARSER_NAME *parser) { \
     parser->cursor++; \
     return 0;\
 } \
-STB_CONCAT(CUR_PARSER_NAME, _AST) STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(CUR_PARSER_NAME *parser) { \
+STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(CUR_PARSER_NAME *parser) { \
     if (parser->cursor >= parser->tokens.datalen) {goto exit;} \
     int Generic; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
-    switch(token.type){ \
-        _expr \
-        default: break; \
-    } \
+    if (0){}_expr; \
 exit: \
-    return (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type = STB_LANG_AST_NONE}; \
+    return NULL; \
 } \
-STB_CONCAT(CUR_PARSER_NAME, _AST) STB_CONCAT(CUR_PARSER_PREFIX, _parse_ast)(CUR_PARSER_NAME *parser) { \
+STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_ast)(CUR_PARSER_NAME *parser) { \
     if (parser->cursor >= parser->tokens.datalen) {goto exit;} \
     int Generic; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
-    switch(token.type){ \
-        _ast \
-        default: break; \
-    } \
+    if (0){}_ast; \
 exit: \
-    return (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type = STB_LANG_AST_NONE}; \
+    return NULL; \
 } \
-STB_CONCAT(CUR_PARSER_NAME, _AST) STB_CONCAT(CUR_PARSER_PREFIX, _parse_body_ast)(CUR_PARSER_NAME *parser) { \
+STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_body_ast)(CUR_PARSER_NAME *parser) { \
     if (parser->cursor >= parser->tokens.datalen) {goto exit;} \
     int Generic; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
-    switch(token.type){ \
-        _body \
-        default: break; \
-    } \
+    if (0){}_body; \
 exit: \
-    return (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type = STB_LANG_AST_NONE}; \
+    return NULL; \
 } \
 char STB_CONCAT(CUR_PARSER_PREFIX, _parse_body)(CUR_PARSER_NAME *parser) { \
     int oldCursor = parser->cursor; \
-    AppendToLinkedList((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST), STB_CONCAT(CUR_PARSER_PREFIX, _parse_body_ast)(parser)); \
+    AppendToLinkedList((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST), *(STB_CONCAT(CUR_PARSER_PREFIX, _parse_body_ast)(parser))); \
     if (parser->cursor == oldCursor){ \
         return STB_CONCAT(CUR_PARSER_PREFIX, _peek)(parser);\
     }else if (parser->cursor >= parser->tokens.datalen){ \
@@ -143,24 +138,60 @@ char STB_CONCAT(CUR_PARSER_PREFIX, _parse_body)(CUR_PARSER_NAME *parser) { \
 #define STB_LANG_MATCH_TYPEINFO(val, typeinfo) if(strcmp(string, val) == 0) {return typeinfo;}
 
 #define STB_LANG_TYPEINFO(...) \
-int STB_CONCAT(CUR_PARSER_TYPEINFO, _lookup_type)(char *string){ \
+int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_type)(char *string){ \
     if (string == NULL) return -1; \
     __VA_ARGS__; \
     return -1; \
-}\
+}
+
+#define STB_LANG_DEFINE_TYPEINFO(...) \
+typedef enum { \
+    STB_LANG_AST_TYPE_NONE = -1, \
+    __VA_ARGS__ \
+}STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo);
+
 
 
 // ^ some typeinfo stuff for the user
 
+#define STB_LANG_AST_LITERAL(typ, token) \
+({ \
+    STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
+    _n->typeinfo = -1; \
+    _n->type = typ; \
+    _n->value = token.value; \
+    _n->left = NULL; \
+    _n->right = NULL; \
+    _n->next = NULL; \
+    _n; \
+})
 
-#define STB_LANG_AST_LITERAL(typ, token) (STB_CONCAT(CUR_PARSER_NAME, _AST)){.typeinfo=-1, .type = typ, .value = token.value}
+#define STB_LANG_AST_ASSIGN(typ, typeinfo, name, eqs) \
+({ \
+    STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
+    _n->typeinfo = typeinfo; \
+    _n->type = typ; \
+    _n->value = name.value; \
+    _n->left = NULL; \
+    _n->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)eqs; \
+    _n->next = NULL; \
+    _n; \
+})
+
 #define STB_LANG_AST_FUNCDEF(typ, name, params, block) \
-(STB_CONCAT(CUR_PARSER_NAME, _AST)){ \
-    .typeinfo = -1, \
-    .type = typ,  \
-    .left=(struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(params, STB_CONCAT(CUR_PARSER_NAME, _AST)), \
-    .right=(struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(block, STB_CONCAT(CUR_PARSER_NAME, _AST)) \
-}
+({ \
+    STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
+    _n->typeinfo = -1; \
+    _n->type = typ; \
+    _n->value = name.value; \
+    _n->left = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(params, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
+    _n->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(block, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
+    _n->next = NULL; \
+    _n; \
+})
+
+#define STB_LANG_OPERAND(var, val) \
+    typeof(val) var = val;
 
 #define STB_LANG_PARSE_CUSTOM_LIST(starttok, splitA, endtok, ...) \
 STB_LANG_EXPECT_TOKEN(starttok) \
@@ -193,7 +224,7 @@ STB_LANG_PARSE_CUSTOM_LIST(starttok, splitA, endtok,  \
 
 
 #define STB_LANG_PARSE_TYPEINFO(name, tok) \
-Generic = STB_CONCAT(CUR_PARSER_TYPEINFO, _lookup_type)(tok.value); \
+Generic = STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_type)(tok.value); \
 STB_LANG_SAVE(name, Generic); \
 if (name != -1)
 
@@ -205,7 +236,7 @@ STB_CONCAT(CUR_PARSER_NAME, _ASTList) into = (STB_CONCAT(CUR_PARSER_NAME, _ASTLi
 InitLinkedList(into, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
 while (token.type != endtok){ \
     STB_LANG_SAVE(old_tok, token); \
-    STB_CONCAT(CUR_PARSER_NAME, _AST) ast = STB_CONCAT(CUR_PARSER_PREFIX, _parse_ast)(parser); \
+    STB_CONCAT(CUR_PARSER_NAME, _AST) ast = *(STB_CONCAT(CUR_PARSER_PREFIX, _parse_ast)(parser)); \
     if (ast.type == STB_LANG_AST_NONE) {STB_LANG_PARSER_PEEK();} \
     AppendToLinkedList(into, STB_CONCAT(CUR_PARSER_NAME, _AST), ast); \
     STB_LANG_PARSER_UPDATE(); \
@@ -234,3 +265,5 @@ STB_LANG_PARSE_CUSTOM_LIST(start, split, end, \
         )\
     }\
 )
+
+#endif

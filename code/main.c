@@ -16,6 +16,7 @@
 #include "../libraries/error/error.h"
 #include "../libraries/tokenizer/tokenizer.h"
 #include "../libraries/parser/parser.h"
+#include "../libraries/typeinfo/typeinfo.h"
 
 char *HELP = "New Programming Language HELP Manual\n\t"
 "-help: creates this page\n";
@@ -32,7 +33,8 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_RB,
         TOKEN_ID,
         TOKEN_NUM,
-        TOKEN_COMMA
+        TOKEN_COMMA,
+        TOKEN_EQ
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
@@ -40,6 +42,7 @@ STB_LANG_NEW_TOKENIZER(
         STB_LANG_TOKEN_CHAR('{', TOKEN_LB)
         STB_LANG_TOKEN_CHAR('}', TOKEN_RB)
         STB_LANG_TOKEN_CHAR(',', TOKEN_COMMA)
+        STB_LANG_TOKEN_CHAR('=', TOKEN_EQ)
 
         STB_LANG_SKIP('\n')
     ),
@@ -50,11 +53,12 @@ STB_LANG_NEW_TOKENIZER(
 
 
 
-#define CUR_PARSER_TYPEINFO Lang_Parser_Types
-typedef enum {
+#define CUR_TYPEINFO_NAME Lang_TypeInfo
+#define CUR_TYPEINFO_PREFIX lang_typeinfo
+STB_LANG_DEFINE_TYPEINFO(
     AST_TYPE_VOID,
     AST_TYPE_INT
-}CUR_PARSER_TYPEINFO;
+)
 STB_LANG_TYPEINFO(
     STB_LANG_MATCH_TYPEINFO("void", AST_TYPE_VOID)
     STB_LANG_MATCH_TYPEINFO("int", AST_TYPE_INT)
@@ -69,7 +73,9 @@ STB_LANG_TYPEINFO(
 STB_LANG_NEW_PARSER(
 STB_LANG_ASTS(
     AST_FUNCDEF,
-    AST_VAR
+    AST_VAR,
+    AST_INT,
+    AST_ASSIGN
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_MATCH_TOKEN(TOKEN_ID, 
@@ -86,13 +92,41 @@ STB_LANG_PARSE_BODY(
 ),
 STB_LANG_PARSE_AST(
     // No ASTS yet!
-    return (Lang_Parser_AST){0};
+    STB_LANG_PARSE_TYPEINFO(typeinfo, token){
+        STB_LANG_PARSER_PEEK()
+    maybe_assign:
+        STB_LANG_IF_TOKEN(TOKEN_ID, 
+            STB_LANG_SAVE(varia, match_token)
+            STB_LANG_IF_TOKEN(TOKEN_EQ,
+                STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser));
+                return STB_LANG_AST_ASSIGN(AST_ASSIGN, typeinfo, varia, assign);
+            )
+        )
+    }else {
+        goto maybe_assign;
+    }
 ),
 STB_LANG_PARSE_EXPR(
     STB_LANG_MATCH_TOKEN(TOKEN_ID,  
         return STB_LANG_AST_LITERAL(AST_VAR, match_token);
     )
+    STB_LANG_MATCH_TOKEN(TOKEN_NUM,  
+        return STB_LANG_AST_LITERAL(AST_INT, match_token);
+    )
 )
+)
+
+STB_LANG_NEW_TYPEINFO(
+    STB_LANG_TYPEINFO_CASE(AST_FUNCDEF){
+        STB_LANG_EXPAND_BLOCK();
+    }
+    STB_LANG_TYPEINFO_CASE(AST_ASSIGN){
+        STB_LANG_ASSIGN()
+    }
+    STB_LANG_TYPEINFO_CASE(AST_INT){
+        STB_LANG_ASSUME_TYPE(AST_TYPE_INT);
+    }
+
 )
 
 int main(int argc, char **argv){
@@ -118,11 +152,20 @@ int main(int argc, char **argv){
     // for (int i=0; i<len; i++){
     //     printf("%d\n", tokenizer->tokens.data[i].type);
     // }
+    
+
     Lang_Parser *parser = lang_parser_init(tokenizer);
     while (lang_parser_parse_body(parser) == 0){
     }
+
     // Lang_Parser_AST *ast = GetLinkedListHead((*parser), Lang_Parser_AST);
     // Lang_Parser_AST *left = (Lang_Parser_AST*)ast->left;
-    // printf("%s, %s\n", left->value, ((Lang_Parser_AST*)left->next)->value);
+    // printf("%s\n", left->value);
+
+
+    Lang_TypeInfo *typeinfo = lang_typeinfo_init(parser);
+    while (lang_typeinfo_check(typeinfo) == 0){
+    }
+    // printf("Hi\n");
     return 0;
 }

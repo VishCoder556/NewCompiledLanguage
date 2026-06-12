@@ -1,3 +1,4 @@
-int a(int thing, void b){
-
+int main(int thing){
+    int a = 300;
+    a = 5
 }

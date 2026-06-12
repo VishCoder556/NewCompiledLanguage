@@ -27,14 +27,14 @@ if (prefix##_head == NULL){ \
 
 #define SetLinkedList(ll1, ll2, type) \
 do { \
-    ll1.type##_head = ll2.type##_head; \
-    ll1.type##_tail = ll2.type##_tail; \
-    ll1.type##_len = ll2.type##_len; \
+    STB_CONCAT(ll1.type, _head) = STB_CONCAT(ll2.type, _head); \
+    STB_CONCAT(ll1.type, _tail) = STB_CONCAT(ll2.type, _tail); \
+    STB_CONCAT(ll1.type, _len) = STB_CONCAT(ll2.type, _len); \
 }while(0)
 
 #define GetLinkedListHead(ll, type) STB_CONCAT(ll.type, _head)
 #define GetLinkedListTail(ll, type) ll.type##_tail
-#define GetLinkedListLen(ll, type) ll.type##_len
+#define GetLinkedListLen(ll, type) STB_CONCAT(ll.type, _len)
 #define GetLinkedListNextElem(ll, type) (type*)ll->next
 
 #define PopTopLinkedList(parent, type) \
