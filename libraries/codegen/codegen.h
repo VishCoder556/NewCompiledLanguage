@@ -43,7 +43,7 @@ STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)((*((STB_CONCAT(CUR_TYPEINFO_
 
 #define STB_LANG_INVOKE_TYPENEW3(a) dymarray_typenew(a, STB_LANG_CODEGEN_REG_MAX, 1)
 
-#define STB_LANG_NEW_CODEGEN(regtypes, matches, list) \
+#define STB_LANG_NEW_CODEGEN(regtypes, matches, prefix, list) \
 dymarray_typenew(char, 300, 40); \
 typedef enum{ \
     regtypes, \
@@ -97,18 +97,6 @@ char *STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(STB_CONCAT(CUR_CODEGEN_
     } \
     return str; \
 }; \
-CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_IR_NAME *ir){ \
-    CUR_CODEGEN_NAME *gen = malloc(sizeof(*gen)); \
-    gen->code = dymarray_char_new(); \
-    gen->instrs = ir->instrs; \
-    gen->cursor = 0; \
-    gen->function_offset = 0; \
-    gen->root_scope = ir->root_scope; \
-    gen->current_scope = gen->root_scope; \
-    gen->regs = STB_CONCAT(CUR_CODEGEN_PREFIX, _regs_init)(); \
- \
-    return gen; \
-} \
 void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, char *str, ...){ \
     va_list args; \
     va_start(args, str); \
@@ -135,6 +123,19 @@ void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, char *str,
     memcpy(gen->code.data+gen->code.datalen, st, len); \
     gen->code.datalen += len; \
     ((char*)gen->code.data)[gen->code.datalen] = '\0'; \
+} \
+CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_IR_NAME *ir){ \
+    CUR_CODEGEN_NAME *gen = malloc(sizeof(*gen)); \
+    gen->code = dymarray_char_new(); \
+    gen->instrs = ir->instrs; \
+    gen->cursor = 0; \
+    gen->function_offset = 0; \
+    gen->root_scope = ir->root_scope; \
+    gen->current_scope = gen->root_scope; \
+    gen->regs = STB_CONCAT(CUR_CODEGEN_PREFIX, _regs_init)(); \
+ \
+    prefix; \
+    return gen; \
 } \
 char STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
     ; \
@@ -163,6 +164,7 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
 STB_LANG_EMIT_CODE("%s:\n", instr->dest); \
 STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n"); \
 STB_LANG_EMIT_CODE("\tmov x29, sp\n"); \
+STB_LANG_EMIT_CODE("\tsub sp, sp, #16\n"); \
 STB_LANG_GO_TO_FUNC(instr->dest);
 
 // #define 
@@ -247,5 +249,12 @@ STB_LANG_CODEGEN_REGISTER_NAMES( \
     STB_LANG_ARM_REG_MAP(14) \
     STB_LANG_ARM_REG_MAP(15) \
 )
+
+#define STB_LANG_ARM_PREFIX \
+STB_LANG_EMIT_CODE("%s\n", ".global _main"); \
+STB_LANG_EMIT_CODE("%s\n", ".align 2");
+
+
+#define STB_LANG_CODEGEN_PREFIX(...) __VA_ARGS__
 
 #endif

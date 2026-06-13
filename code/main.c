@@ -19,6 +19,7 @@
 #include "../libraries/typeinfo/typeinfo.h"
 #include "../libraries/ir/ir.h"
 #include "../libraries/codegen/codegen.h"
+#include "../libraries/driver/driver.h"
 
 char *HELP = "New Programming Language HELP Manual\n\t"
 "-help: creates this page\n";
@@ -169,26 +170,38 @@ STB_LANG_NEW_IR(
 #define CUR_CODEGEN_NAME Lang_CodeGen
 #define CUR_CODEGEN_PREFIX lang_codegen
 STB_LANG_NEW_CODEGEN(
+    STB_LANG_ARM_REGISTERS(),
+    STB_LANG_ARM_REGISTER_MAPS(),
+    STB_LANG_CODEGEN_PREFIX(
+        STB_LANG_ARM_PREFIX
+    ),
 
-STB_LANG_ARM_REGISTERS(),
-STB_LANG_ARM_REGISTER_MAPS(),
-
-STB_LANG_CODEGEN_LIST(
-    STB_LANG_CODEGEN_CASE(IR_FUNCDEF_BEGIN,
-        STB_LANG_ARM_PROLOGUE();
+    STB_LANG_CODEGEN_LIST(
+        STB_LANG_CODEGEN_CASE(IR_FUNCDEF_BEGIN,
+            STB_LANG_ARM_PROLOGUE();
+        )
+        STB_LANG_CODEGEN_CASE(IR_ASSIGN,
+            STB_LANG_ARM_ASSIGN();
+        )
+        STB_LANG_CODEGEN_CASE(IR_DECL,
+            STB_LANG_ARM_DECLARE();
+        )
+        STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
+            STB_LANG_ARM_EPILOGUE();
+        )
     )
-    STB_LANG_CODEGEN_CASE(IR_ASSIGN,
-        STB_LANG_ARM_ASSIGN();
-    )
-    STB_LANG_CODEGEN_CASE(IR_DECL,
-        STB_LANG_ARM_DECLARE();
-    )
-    STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
-        STB_LANG_ARM_EPILOGUE();
-    )
-)
 );
 
+#define CUR_DRIVER_PREFIX lang_driver
+
+STB_LANG_NEW_DRIVER(
+    char *asm_path = "res/main.s";
+    char *obj_path = "res/main.o";
+    char *exec_path = "res/main.out";
+    STB_LANG_DRIVER_WRITE_DATA(asm_path)
+    STB_LANG_DRIVER_RUN_SCRIPT("clang -c %s -o %s", asm_path, obj_path)
+    STB_LANG_DRIVER_RUN_SCRIPT("clang -O0 -fno-stack-protector -fno-common -fno-exceptions -arch arm64 %s -o %s -e _main -Wl,-w -Wl,-platform_version,macos,11.0,11.0 -lc", obj_path, exec_path)
+);
 
 int main(int argc, char **argv){
 
@@ -236,6 +249,8 @@ int main(int argc, char **argv){
     Lang_CodeGen *gen = lang_codegen_init(ir);
     while (lang_codegen_ir(gen) == 0){
     }
+
+    STB_LANG_INVOKE_DRIVER(gen);
     printf("-------- ASSEMBLY CODE --------\n");
     printf("%s\n", gen->code.data);
     return 0;

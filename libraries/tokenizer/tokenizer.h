@@ -29,7 +29,7 @@ int stb_lang_tokenizer_get_length(FILE *file){
     STB_LANG_ADD_TOKEN(.type = tkn, .value=NULL); break;
 #define STB_LANG_SIMPLE_CASES(...) __VA_ARGS__
 #define STB_LANG_ALPHA(typ, ...) \
-    if (isalpha(c)) { \
+    if (isalpha(c) || c == '_') { \
         int valcap = 100, vallen = 0; \
         char *val = malloc(valcap); \
         while (isalnum(c) || c == '_'){ \
