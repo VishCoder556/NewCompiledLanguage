@@ -21,31 +21,16 @@ int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, 
     if (var == NULL) {return -1;} \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope; \
     STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table = scope->symbols; \
-    int offset = 0; \
     for (int i=0; i<symbol_table.datalen; i++){\
         STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = symbol_table.data[i]; \
         if (symbol.name != NULL){ \
             if (strcmp(symbol.name, var) == 0){ \
-                return offset; \
+                return symbol.offset; \
             }; \
         } \
-        offset += STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(symbol.typeinfo); \
     }; \
     return 0; \
 }
-// ^ no offset yet
-
-
-// #define STB_LANG_SIZE_OFFSET() \
-// int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
-//     ; \
-//     return 0; \
-// }; \
-// int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
-//     return 0; \
-// }
-// ^ Temporary until fixed
-
 
 #define STB_LANG_GO_TO_FUNC(nam) \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scop = (((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope)); \

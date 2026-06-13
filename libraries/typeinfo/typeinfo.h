@@ -19,7 +19,13 @@
 
 // #define STB_LANG_REGISTER_SYMBOL(nam, typeinf) do {if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(checker->symbol_table), (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.name=nam, .typeinfo=typeinf});}}while(0);
 
-#define STB_LANG_ADD_SYMBOL(typeinf, ...) do {if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(__VA_ARGS__);}}while(0);
+// checker->entry_offset = 0;
+#define STB_LANG_ADD_SYMBOL(typeinf, scp, ...) do {if(typeinf != -1) { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = __VA_ARGS__; \
+    symbol.offset = checker->entry_offset; \
+    checker->entry_offset += STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(symbol.typeinfo); \
+    STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(scp, symbol);} \
+}while(0);
 
 
 #define STB_LANG_REGISTER_SYMBOL(nam, typeinf)  \
@@ -35,20 +41,16 @@ STB_LANG_ADD_SYMBOL(typeinf, \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(checker->current_scope), nam); \
 if (symbol.typeinfo != -1) {ast->typeinfo = symbol.typeinfo;}
 
-// #define STB_LANG_INFER_TYPE(nam)
-// ^ Temporary until fixed
-
 #define STB_LANG_SCOPE_MAKE_CHILD(paren, ...) \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* news = ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)paren); \
 STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL), _add)(&news->children, __VA_ARGS__); paren = (__VA_ARGS__);
 
 
-// printf("%s\n", (((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)checker->current_scope)->name)); \
-
 #define STB_LANG_NEW_TYPEINFO(...) \
 typedef struct { \
     char *name; \
     int typeinfo; \
+    int offset; \
 }STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol);\
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)); \
 struct STB_CONCAT(CUR_TYPEINFO_NAME, _Scope); \
@@ -67,6 +69,8 @@ typedef struct { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) current_scope; \
     int cursor; \
+    \
+    int entry_offset; \
 }CUR_TYPEINFO_NAME; \
 STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) paren, char *name){ \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scope = malloc(sizeof(*scope)); \
@@ -125,6 +129,7 @@ CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parse
     typeinfo->tail = typeinfo->head; \
     typeinfo->root_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, NULL); \
     typeinfo->current_scope = typeinfo->root_scope; \
+    typeinfo->entry_offset = 0; \
     return typeinfo; \
 } \
 int a = 0; \
@@ -154,9 +159,10 @@ while (_block != NULL){ \
 #define STB_LANG_MAKE_SCOPE(nam) do {\
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) new_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, nam); \
     STB_LANG_SCOPE_MAKE_CHILD(checker->current_scope, new_scope); \
+    checker->entry_offset = 0; \
 }while(0);
 
-#define STB_LANG_ASSUME_TYPE(typ) if (ast->typeinfo == -1) {ast->typeinfo = typ;}
+#define STB_LANG_TYPEINFO_ASSUME_TYPE(typ) if (ast->typeinfo == -1) {ast->typeinfo = typ;}
 
 #define STB_LANG_LHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left)
 #define STB_LANG_RHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->right)
@@ -171,16 +177,22 @@ stb_lang_error_major_global("TypeinfoError", "Expected types to be equal"); \
 }}
 // ^ Yes, the error messages look bad as of right now; I will fix them eventually.
 
-#define STB_LANG_ASSIGN() \
+
+#define STB_LANG_TYPEINFO_ASSIGN() \
 STB_LANG_EXPAND_RHS(); \
 STB_LANG_INFER_TYPE(ast->value); \
 STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
 STB_LANG_SYMBOL(ast);
 
-#define STB_LANG_DECL() \
+#define STB_LANG_TYPEINFO_DECL() \
 STB_LANG_EXPAND_RHS(); \
 STB_LANG_INFER_TYPE(ast->value); \
 STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
 STB_LANG_SYMBOL(ast);
+
+#define STB_LANG_TYPEINFO_FUNCDEF() \
+STB_LANG_MAKE_SCOPE(ast->value); \
+STB_LANG_EXPAND_PARAMS(); \
+STB_LANG_EXPAND_BLOCK();
 
 #endif
