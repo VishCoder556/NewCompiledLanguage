@@ -8,34 +8,68 @@
 
 #define STB_LANG_EMIT_CODE(...) STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(gen, __VA_ARGS__);
 
+
+#define STB_LANG_SIZE_OFFSET() \
+int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *cur_scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope; \
+    int typeinfo = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(cur_scope, var).typeinfo; \
+    return STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(typeinfo); \
+}; \
+\
+\
+int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
+    if (var == NULL) {return -1;} \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope; \
+    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table = scope->symbols; \
+    int offset = 0; \
+    for (int i=0; i<symbol_table.datalen; i++){\
+        STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = symbol_table.data[i]; \
+        if (symbol.name != NULL){ \
+            if (strcmp(symbol.name, var) == 0){ \
+                return offset; \
+            }; \
+        } \
+        offset += STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(symbol.typeinfo); \
+    }; \
+    return 0; \
+}
+// ^ no offset yet
+
+
+// #define STB_LANG_SIZE_OFFSET() \
+// int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
+//     ; \
+//     return 0; \
+// }; \
+// int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
+//     return 0; \
+// }
+// ^ Temporary until fixed
+
+
+#define STB_LANG_GO_TO_FUNC(nam) \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scop = (((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope)); \
+STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)((*((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->root_scope)), nam, scop);
+
 #define STB_LANG_NEW_CODEGEN(list) \
 dymarray_typenew(char, 300, 40); \
 typedef struct { \
     STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr) instrs; \
     int cursor; \
     dymarray_char code; \
-    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table; \
+    int function_offset; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) current_scope; \
 }CUR_CODEGEN_NAME; \
-int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
-    int typeinfo = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(gen->symbol_table, var, NULL).typeinfo; \
-    return STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(typeinfo); \
-}; \
-int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, char *var){ \
-    int idx = -1; \
-    STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(gen->symbol_table, var, &idx).typeinfo; \
-    if (idx == -1) return -1; \
-    int offset = 0; \
-    for (int i=0; i<idx; i++){ \
-        offset += STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(gen->symbol_table, var, NULL).typeinfo); \
-    } \
-    return offset; \
-} \
+STB_LANG_SIZE_OFFSET(); \
 CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_IR_NAME *ir){ \
     CUR_CODEGEN_NAME *codegen = malloc(sizeof(*codegen)); \
     codegen->code = dymarray_char_new(); \
     codegen->instrs = ir->instrs; \
     codegen->cursor = 0; \
-    codegen->symbol_table = ir->symbol_table; \
+    codegen->function_offset = 0; \
+    codegen->root_scope = ir->root_scope; \
+    codegen->current_scope = codegen->root_scope; \
     return codegen; \
 } \
 void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, char *str, ...){ \
@@ -83,14 +117,16 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
 #define STB_LANG_ARM_PROLOGUE() \
 STB_LANG_EMIT_CODE("%s:\n", instr->dest); \
 STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n"); \
-STB_LANG_EMIT_CODE("\tmov x29, sp\n");
+STB_LANG_EMIT_CODE("\tmov x29, sp\n"); \
+STB_LANG_GO_TO_FUNC(instr->dest);
 
 
 #define STB_LANG_X86_64_PROLOGUE() \
 STB_LANG_EMIT_CODE("%s:\n", instr->dest); \
 STB_LANG_EMIT_CODE("\tpush rbp\n"); \
 STB_LANG_EMIT_CODE("\tmov rbp, rsp\n"); \
-STB_LANG_EMIT_CODE("\tsub rsp, 32\n");
+STB_LANG_EMIT_CODE("\tsub rsp, 32\n"); \
+STB_LANG_GO_TO_FUNC(instr->dest);
 
 
 #define STB_LANG_ARM_EPILOGUE() \

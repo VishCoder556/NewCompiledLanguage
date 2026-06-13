@@ -1,4 +1,4 @@
 int main(){
     int a = 300;
-    int b = 5
+    int b = 5;
 }

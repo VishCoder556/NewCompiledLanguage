@@ -17,13 +17,33 @@
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 3)
 
-#define STB_LANG_REGISTER_SYMBOL(nam, typeinf) do {if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(checker->symbol_table), (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.name=nam, .typeinfo=typeinf});}}while(0);
+// #define STB_LANG_REGISTER_SYMBOL(nam, typeinf) do {if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(checker->symbol_table), (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.name=nam, .typeinfo=typeinf});}}while(0);
+
+#define STB_LANG_ADD_SYMBOL(typeinf, ...) do {if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(__VA_ARGS__);}}while(0);
+
+
+#define STB_LANG_REGISTER_SYMBOL(nam, typeinf)  \
+STB_LANG_ADD_SYMBOL(typeinf, \
+    &(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)checker->current_scope)->symbols),  \
+    ((STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) {.name=nam, .typeinfo=typeinf}) \
+);
+
 
 #define STB_LANG_SYMBOL(ast) STB_LANG_REGISTER_SYMBOL(ast->value, ast->typeinfo)
 
 #define STB_LANG_INFER_TYPE(nam) \
-STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(checker->symbol_table, nam, NULL); \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(checker->current_scope), nam); \
 if (symbol.typeinfo != -1) {ast->typeinfo = symbol.typeinfo;}
+
+// #define STB_LANG_INFER_TYPE(nam)
+// ^ Temporary until fixed
+
+#define STB_LANG_SCOPE_MAKE_CHILD(paren, ...) \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* news = ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)paren); \
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL), _add)(&news->children, __VA_ARGS__); paren = (__VA_ARGS__);
+
+
+// printf("%s\n", (((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)checker->current_scope)->name)); \
 
 #define STB_LANG_NEW_TYPEINFO(...) \
 typedef struct { \
@@ -31,36 +51,80 @@ typedef struct { \
     int typeinfo; \
 }STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol);\
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)); \
+struct STB_CONCAT(CUR_TYPEINFO_NAME, _Scope); \
+typedef struct STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL); \
+STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL)); \
+typedef struct { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) parent; \
+    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL) children; \
+    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbols; \
+    char *name; \
+}STB_CONCAT(CUR_TYPEINFO_NAME, _Scope); \
 typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *head; \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *tail; \
 \
-    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) current_scope; \
     int cursor; \
 }CUR_TYPEINFO_NAME; \
-STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table, char *query, int *idx){ \
+STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) paren, char *name){ \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scope = malloc(sizeof(*scope)); \
+    scope->parent = paren; \
+    scope->children = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL), _new)(); \
+    scope->symbols = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _new)(); \
+    scope->name = name; \
+    return (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))scope; \
+} \
+int STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_from_symbols)(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbol_table, char *query, STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) *sym){ \
     if (query == NULL) {goto exit;} \
     for (int i=0; i<symbol_table.datalen; i++){\
         STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = symbol_table.data[i]; \
         if (symbol.name != NULL){ \
             if (strcmp(symbol.name, query) == 0){ \
-                if (idx != NULL) \
-                    *idx = i; \
-                return symbol; \
+                if (sym != NULL) \
+                    *sym = symbol; \
+                return 1; \
             }; \
         } \
     }; \
 exit: \
-    if (idx != NULL) \
-        *idx = -1; \
-    return (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.typeinfo = STB_LANG_AST_TYPE_NONE}; \
+    return 0; \
+} \
+int STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) scope, char *query, STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *_new){ \
+    if (query == NULL) {goto exit;} \
+    for (int i=0; i<scope.children.datalen; i++){\
+        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *a = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope.children.data[i]; \
+        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) scope1 = *((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope.children.data[i]); \
+        if (scope1.name != NULL){ \
+            if (strcmp(scope1.name, query) == 0){ \
+                if (_new != NULL) \
+                    *_new = scope1; \
+                return 1; \
+            }; \
+        } \
+    }; \
+exit: \
+    return 0; \
+} \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope, char *query){ \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *sc = scope; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) sym = (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.typeinfo = -1}; \
+    while (sc != NULL){ \
+        if (STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_from_symbols)(sc->symbols, query, &sym)) { \
+            return sym; \
+        } \
+        sc = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)sc->parent; \
+    } \
+    return (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.typeinfo = -1}; \
 } \
 CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parser) { \
     CUR_TYPEINFO_NAME *typeinfo = malloc(sizeof(*typeinfo)); \
     typeinfo->cursor = 0; \
     typeinfo->head = GetLinkedListHead((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST)); \
     typeinfo->tail = typeinfo->head; \
-    typeinfo->symbol_table = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _new)(); \
+    typeinfo->root_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, NULL); \
+    typeinfo->current_scope = typeinfo->root_scope; \
     return typeinfo; \
 } \
 int a = 0; \
@@ -87,6 +151,10 @@ while (_block != NULL){ \
     _block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_block->next; \
 }}while(0);
 
+#define STB_LANG_MAKE_SCOPE(nam) do {\
+    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) new_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, nam); \
+    STB_LANG_SCOPE_MAKE_CHILD(checker->current_scope, new_scope); \
+}while(0);
 
 #define STB_LANG_ASSUME_TYPE(typ) if (ast->typeinfo == -1) {ast->typeinfo = typ;}
 
