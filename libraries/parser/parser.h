@@ -39,7 +39,7 @@
 break; \
 }
 
-#define STB_LANG_SAVE(name, thing) typeof(thing) name = thing;
+#define STB_LANG_SAVE(name, ...) typeof(__VA_ARGS__) name = __VA_ARGS__;
 
 #define STB_LANG_IF_TOKEN(typ, ...) if (token.type == typ) {match_token = token; STB_LANG_PARSER_PEEK();__VA_ARGS__;}
 #define STB_LANG_IF_VALUE(typ, val, ...) if (token.type == typ) {if (strcmp(token.value, val) == 0){match_token = token;STB_LANG_PARSER_PEEK();__VA_ARGS__;};}
