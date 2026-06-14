@@ -19,15 +19,16 @@
 #define STB_CONCAT(a, b) STB_CONCAT_EVAL(a, b)
 #define STB_CONCAT3(a, b, c) STB_CONCAT3_EVAL(a, b, c)
 
-#define STB_LANG_ERROR_FALLOUT(where) stb_lang_error_major_global("ParserError", "Found incorrect grammar in %s", where);
+#define STB_LANG_ERROR_FALLOUT(where) stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ParserError", "Could not parse %s", where)
 
 #define STB_LANG_ASTS(...) __VA_ARGS__
 #define STB_LANG_PARSE_BODY(...) __VA_ARGS__; STB_LANG_ERROR_FALLOUT("body statement");
-#define STB_LANG_PARSE_AST(...) __VA_ARGS__; STB_LANG_ERROR_FALLOUT("body statement");
-#define STB_LANG_PARSE_EXPR(...) __VA_ARGS__;STB_LANG_ERROR_FALLOUT("body statement"); 
+#define STB_LANG_PARSE_AST(...) __VA_ARGS__; STB_LANG_ERROR_FALLOUT("statement");
+#define STB_LANG_PARSE_EXPR(...) __VA_ARGS__;STB_LANG_ERROR_FALLOUT("expression"); 
 
 #define STB_LANG_PARSER_UPDATE() token = parser->tokens.data[parser->cursor];
-#define STB_LANG_PARSER_PEEK(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _peek)(parser) == -1){stb_lang_error_major_global("OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
+#define STB_LANG_PARSER_PEEK(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _peek)(parser) == -1){stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
+
 
 #define STB_LANG_MATCH_TOKEN(typ, ...) else if (token.type == typ) {match_token = token; STB_LANG_PARSER_PEEK();__VA_ARGS__;}
 #define STB_LANG_MATCH_VALUE(typ, val, ...) else if(token.type == typ) \
@@ -50,7 +51,7 @@ break; \
 // STB_LANG_EXPECT_TOKEN: yes, the error messages are bland and weird, this is a TODO for later
 #define STB_LANG_EXPECT_TOKEN(typ) \
 if (token.type != typ){ \
-    stb_lang_error_major_global("ExpectError", "Expected token '%d', got '%d'\n", typ, token.type); \
+    stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ExpectError", "Expected token '%d', got '%d'", typ, token.type); \
 }else {STB_LANG_PARSER_PEEK();}
 
 
@@ -75,6 +76,7 @@ typedef struct { \
     STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token) tokens; \
     LinkedList(STB_CONCAT(CUR_PARSER_NAME, _AST)); \
     int cursor; \
+    STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
 }CUR_PARSER_NAME; \
 typedef struct { \
     LinkedList(STB_CONCAT(CUR_PARSER_NAME, _AST)); \
@@ -84,6 +86,7 @@ CUR_PARSER_NAME *STB_CONCAT(CUR_PARSER_PREFIX, _init)(CUR_TOKENIZER_NAME *tokeni
     parser->cursor = 0; \
     parser->tokens = tokenizer->tokens; \
     InitLinkedList((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST)); \
+    parser->file = tokenizer->file; \
     return parser; \
 } \
 char STB_CONCAT(CUR_PARSER_PREFIX, _peek)(CUR_PARSER_NAME *parser) { \
@@ -212,7 +215,7 @@ while (token.type != endtok){ \
     }else {Generic = 0;} \
 } \
 if (Generic == 1){ \
-    stb_lang_error_major_global("ExprListError", "Split token found before end"); \
+    stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ExprListError", "Split token found before end"); \
 } \
 STB_LANG_EXPECT_TOKEN(endtok)
 
@@ -252,7 +255,7 @@ while (token.type != endtok){ \
     }else {Generic = 0;} \
 } \
 if (Generic == 1){ \
-    stb_lang_error_major_global("ExprListError", "Generic found before end"); \
+    stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ExprListError", "Generic found before end"); \
 } \
 STB_LANG_EXPECT_TOKEN(endtok)
 

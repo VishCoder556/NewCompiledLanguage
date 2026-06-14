@@ -23,7 +23,7 @@ int stb_lang_tokenizer_get_length(FILE *file){
     return a;
 }
 
-#define STB_LANG_ADD_TOKEN(...) STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer->tokens, (STB_CONCAT(CUR_TOKENIZER_NAME, _Token)){__VA_ARGS__, .offset=tokenizer->cursor});
+#define STB_LANG_ADD_TOKEN(...) STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer->tokens, (STB_CONCAT(CUR_TOKENIZER_NAME, _Token)){__VA_ARGS__, .offset=oldCursor});
 
 #define STB_LANG_TOKEN_CHAR(ch, tkn) case ch: \
     STB_LANG_ADD_TOKEN(.type = tkn, .value=NULL); break;
@@ -38,7 +38,7 @@ int stb_lang_tokenizer_get_length(FILE *file){
                 val = realloc(val, valcap); \
             } \
             val[vallen++] = c; \
-            if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer) == -1) {break;}; \
+            if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1) {break;}; \
             c = tokenizer->file.contents[tokenizer->cursor]; \
         } \
         val[vallen++] = '\0'; tokenizer->cursor--; \
@@ -54,7 +54,7 @@ int stb_lang_tokenizer_get_length(FILE *file){
                 val = realloc(val, valcap); \
             } \
             val[vallen++] = c; \
-            if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer) == -1){break;}; \
+            if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1){break;}; \
             c = tokenizer->file.contents[tokenizer->cursor]; \
         } \
         val[vallen++] = '\0'; tokenizer->cursor--; \
@@ -106,7 +106,7 @@ STB_CONCAT(CUR_TOKENIZER_NAME, _File) STB_CONCAT(CUR_TOKENIZER_PREFIX, _file_ini
     fclose(file); \
     return fl; \
 }; \
-char STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(CUR_TOKENIZER_NAME *tokenizer){ \
+char STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(CUR_TOKENIZER_NAME *tokenizer){ \
     char c = tokenizer->file.contents[tokenizer->cursor]; \
     tokenizer->cursor++; \
     if (tokenizer->cursor >= tokenizer->file.contentlen) return -1; \
@@ -121,6 +121,7 @@ CUR_TOKENIZER_NAME* STB_CONCAT(CUR_TOKENIZER_PREFIX, _init)(char *name){ \
 }; \
 char STB_CONCAT(CUR_TOKENIZER_PREFIX, _token)(CUR_TOKENIZER_NAME *tokenizer){ \
     char c = tokenizer->file.contents[tokenizer->cursor]; \
+    int oldCursor = tokenizer->cursor; \
     switch (c){ \
         _cases \
         default: { \
@@ -128,7 +129,7 @@ char STB_CONCAT(CUR_TOKENIZER_PREFIX, _token)(CUR_TOKENIZER_NAME *tokenizer){ \
             break; \
         }; \
     } \
-    c = STB_CONCAT(CUR_TOKENIZER_PREFIX, _peek)(tokenizer); \
+    c = STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer); \
     if (c == -1) return -1; \
     if (c == '\0' || c == -1) return -1; \
     return 0; \
