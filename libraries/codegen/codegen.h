@@ -38,8 +38,9 @@ int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, 
 }
 
 #define STB_LANG_GO_TO_FUNC(nam) \
-STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scop = (((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope)); \
-STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)((*((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->root_scope)), nam, scop);
+STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* _curscope = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope; \
+STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)((*((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->root_scope)), nam, &_curscope); \
+gen->current_scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))_curscope;
 
 #define STB_LANG_INVOKE_TYPENEW3(a) dymarray_typenew(a, STB_LANG_CODEGEN_REG_MAX, 1)
 
@@ -163,21 +164,21 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
 
 
 #define STB_LANG_ARM_PROLOGUE() \
-STB_LANG_EMIT_CODE("%s:\n", instr->dest); \
+STB_LANG_EMIT_CODE("%s:\n", instr->dest->value); \
 STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n"); \
 STB_LANG_EMIT_CODE("\tmov x29, sp\n"); \
-STB_LANG_EMIT_CODE("\tsub sp, sp, #16\n"); \
-STB_LANG_GO_TO_FUNC(instr->dest);
+STB_LANG_EMIT_CODE("\tsub sp, sp, #32\n"); \
+STB_LANG_GO_TO_FUNC(instr->dest->value);
 
 // #define 
 // STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(CUR_CODEGEN_NAME *gen))
 
 #define STB_LANG_X86_64_PROLOGUE() \
-STB_LANG_EMIT_CODE("%s:\n", instr->dest); \
+STB_LANG_EMIT_CODE("%s:\n", instr->dest->value); \
 STB_LANG_EMIT_CODE("\tpush rbp\n"); \
 STB_LANG_EMIT_CODE("\tmov rbp, rsp\n"); \
 STB_LANG_EMIT_CODE("\tsub rsp, 32\n"); \
-STB_LANG_GO_TO_FUNC(instr->dest);
+STB_LANG_GO_TO_FUNC(instr->dest->value); \
 
 
 #define STB_LANG_ARM_EPILOGUE() \
@@ -191,24 +192,70 @@ STB_LANG_EMIT_CODE("\tpop rbp\n"); \
 STB_LANG_EMIT_CODE("\tret\n");
 
 #define STB_LANG_CODEGEN_ASSIGN()\
-int size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->dest); \
-int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest);
+int size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->src->value); \
+int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value);
 
-#define STB_LANG_ARM_ASSIGN() \
-STB_LANG_CODEGEN_ASSIGN(); \
-STB_LANG_ALLOC_REGISTER(freg); \
-if (size == 4) { \
-    STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 4), instr->src); \
-    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 4), offset); \
-}  \
-else if (size == 8) { \
-    STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 8), instr->src); \
-    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 4), offset); \
+#define STB_LANG_ARM_ASSIGN(lit, var) \
+if (instr->dest->type == var){ \
+    STB_LANG_CODEGEN_ASSIGN();  \
+    STB_LANG_ALLOC_REGISTER(freg); \
+    if (size == 4) { \
+        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 4), instr->src->value); \
+        STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 4), offset); \
+    }  \
+    else if (size == 8) { \
+        if (instr->src->type == var){ \
+            int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value); \
+            STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 8), newoffset); \
+        }else if(instr->src->type == lit){ \
+            STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 8), instr->src->value); \
+        } \
+        STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 4), offset); \
+    } \
+    STB_LANG_FREE_REGISTER(freg); \
+}else if (instr->dest->value[0] == 'a'){ \
+    int r = atoi(instr->dest->value+1); \
+    if (instr->src->type == var){ \
+        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value); \
+        STB_LANG_EMIT_CODE("\tstr x%d, [sp, #%d]\n", r, newoffset); \
+    }else if(instr->dest->type == lit){ \
+        STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->src->value); \
+    } \
 } \
-STB_LANG_FREE_REGISTER(freg);
+
+#define STB_LANG_ARM_ASSIGN_REG(reg, lit, var) \
+if (instr->dest->type == reg && instr->dest->value[0] == 'a'){ \
+    int r = atoi(instr->dest->value+1); \
+    if (instr->src->type == lit) { \
+        STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->src->value); \
+    }else if (instr->src->type == var){ \
+        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value); \
+        STB_LANG_EMIT_CODE("\tldr x%d, [sp, #%d]\n", r, newoffset); \
+    } \
+}
 
 
-#define STB_LANG_ARM_DECLARE() STB_LANG_ARM_ASSIGN()
+#define STB_LANG_ARM_FUNCALL() \
+STB_LANG_EMIT_CODE("\tbl %s\n", instr->dest->value);
+
+
+#define STB_LANG_ARM_PUSH(lit, var) \
+    STB_LANG_ALLOC_REGISTER(pushreg); \
+    if (instr->dest->type == lit) { \
+        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(pushreg, 8), instr->src->value); \
+    }else if(instr->dest->type == var){ \
+        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value); \
+        STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", STB_LANG_REGISTER(pushreg, 8), newoffset); \
+    } \
+    STB_LANG_EMIT_CODE("\tstr %s, [sp, #-16]!\n", STB_LANG_REGISTER(pushreg, 8)); \
+    STB_LANG_FREE_REGISTER(pushreg);
+
+// FIXED: Pop reads your target register from the stack memory space and clears 16 alignment bytes
+#define STB_LANG_ARM_POP() \
+    STB_LANG_EMIT_CODE("\tldr %s, [sp], #16\n", instr->dest->value);
+
+
+#define STB_LANG_ARM_DECLARE(...) STB_LANG_ARM_ASSIGN(__VA_ARGS__)
 // ^ Yes, they are the same thing for now, but later on I will add a second symbol table with offsets and then they'll be different
 
 #define STB_LANG_ARM_REG_MAP(num) \
@@ -216,14 +263,6 @@ STB_LANG_FREE_REGISTER(freg);
 
 #define STB_LANG_ARM_REGISTERS() \
 STB_LANG_CODEGEN_REGISTERS( \
-    REG_X0, \
-    REG_X1, \
-    REG_X2, \
-    REG_X3, \
-    REG_X4, \
-    REG_X5, \
-    REG_X6, \
-    REG_X7, \
     REG_X9, \
     REG_X10, \
     REG_X11, \
@@ -235,14 +274,6 @@ STB_LANG_CODEGEN_REGISTERS( \
 
 #define STB_LANG_ARM_REGISTER_MAPS() \
 STB_LANG_CODEGEN_REGISTER_NAMES( \
-    STB_LANG_ARM_REG_MAP(0) \
-    STB_LANG_ARM_REG_MAP(1) \
-    STB_LANG_ARM_REG_MAP(2) \
-    STB_LANG_ARM_REG_MAP(3) \
-    STB_LANG_ARM_REG_MAP(4) \
-    STB_LANG_ARM_REG_MAP(5) \
-    STB_LANG_ARM_REG_MAP(6) \
-    STB_LANG_ARM_REG_MAP(7) \
     STB_LANG_ARM_REG_MAP(9) \
     STB_LANG_ARM_REG_MAP(10) \
     STB_LANG_ARM_REG_MAP(11) \

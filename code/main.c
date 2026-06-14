@@ -83,14 +83,16 @@ STB_LANG_ASTS(
     AST_VAR,
     AST_INT,
     AST_ASSIGN,
-    AST_DECL
+    AST_DECL,
+    AST_FUNCALL
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_MATCH_TOKEN(TOKEN_ID, 
         STB_LANG_PARSE_TYPEINFO(typeinfo, match_token){
             STB_LANG_IF_TOKEN(TOKEN_ID, // Function name
+                STB_LANG_PARSER_ADVANCE();
                 STB_LANG_SAVE(func_name, match_token);
-                STB_LANG_PARSE_ARGUMENT_LIST(params, TOKEN_LP, TOKEN_COMMA, TOKEN_RP)
+                STB_LANG_PARSE_ARGUMENT_LIST(params, TOKEN_LP, TOKEN_COMMA, TOKEN_RP, AST_VAR)
                 STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
                 Lang_Parser_AST *ast = (Lang_Parser_AST*)GetLinkedListHead(params, Lang_Parser_AST);
                 return STB_LANG_AST_FUNCDEF(AST_FUNCDEF, func_name, params, stmnts)
@@ -101,13 +103,18 @@ STB_LANG_PARSE_BODY(
 STB_LANG_PARSE_AST(
     // No ASTS yet!
     STB_LANG_PARSE_TYPEINFO(typeinfo, token){
-        STB_LANG_PARSER_PEEK()
+        STB_LANG_PARSER_ADVANCE()
     maybe_assign:
         STB_LANG_IF_TOKEN(TOKEN_ID, 
+            STB_LANG_PARSER_ADVANCE()
             STB_LANG_SAVE(varia, match_token)
             STB_LANG_IF_TOKEN(TOKEN_EQ,
+                STB_LANG_PARSER_ADVANCE();
                 STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser));
                 return STB_LANG_AST_ASSIGN_DECL(AST_ASSIGN, AST_DECL, typeinfo, varia, assign);
+            ) STB_LANG_ELSE_IF_TOKEN(TOKEN_LP,
+                STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
+                return STB_LANG_AST_FUNCALL(AST_FUNCALL, varia, args)
             )
         )
     }else {
@@ -137,32 +144,48 @@ STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_INT){
         STB_LANG_TYPEINFO_ASSUME_TYPE(AST_TYPE_INT);
     }
+    STB_LANG_TYPEINFO_CASE(AST_FUNCALL){
+        // Not implemented yet
+    }
 )
 
 #define CUR_IR_NAME Lang_IR
 #define CUR_IR_PREFIX lang_ir
 
 STB_LANG_NEW_IR(
+    STB_LANG_IR_OPERANDS(
+        IR_INT,
+        IR_VAR,
+        IR_REG
+    ),
     STB_LANG_IR_INSTRS(
         IR_FUNCDEF_BEGIN,
         IR_FUNCDEF_END,
         IR_ASSIGN,
         IR_DECL,
         IR_POP, // pop the stack
-        IR_PUSH // push the stack (for later on, not used yet)
+        IR_PUSH,
+        IR_CALL,
+        IR_ASSIGN_REG
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
-            STB_LANG_IR_FUNCDEF(IR_FUNCDEF_BEGIN, IR_POP, IR_FUNCDEF_END)
+            STB_LANG_IR_FUNCDEF(IR_VAR, IR_FUNCDEF_BEGIN, IR_ASSIGN, IR_REG, IR_FUNCDEF_END)
         )
         STB_LANG_IR_CASE(AST_ASSIGN,
-            STB_LANG_IR_ASSIGN(IR_ASSIGN);
+            STB_LANG_IR_ASSIGN(IR_VAR, IR_ASSIGN);
+        )
+        STB_LANG_IR_CASE(AST_VAR,
+            STB_LANG_IR_RETURN_SELF(IR_VAR);
         )
         STB_LANG_IR_CASE(AST_DECL,
-            STB_LANG_IR_ASSIGN(IR_DECL);
+            STB_LANG_IR_ASSIGN(IR_VAR, IR_DECL);
         )
         STB_LANG_IR_CASE(AST_INT,
-            STB_LANG_IR_RETURN_SELF();
+            STB_LANG_IR_RETURN_SELF(IR_INT);
+        )
+        STB_LANG_IR_CASE(AST_FUNCALL,
+            STB_LANG_IR_FUNCALL(IR_VAR, IR_CALL, IR_ASSIGN_REG, IR_REG);
         )
     )
 );
@@ -181,10 +204,22 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_ARM_PROLOGUE();
         )
         STB_LANG_CODEGEN_CASE(IR_ASSIGN,
-            STB_LANG_ARM_ASSIGN();
+            STB_LANG_ARM_ASSIGN(IR_INT, IR_VAR);
         )
         STB_LANG_CODEGEN_CASE(IR_DECL,
-            STB_LANG_ARM_DECLARE();
+            STB_LANG_ARM_DECLARE(IR_INT, IR_VAR);
+        )
+        STB_LANG_CODEGEN_CASE(IR_PUSH,
+            STB_LANG_ARM_PUSH(IR_INT, IR_VAR);
+        )
+        STB_LANG_CODEGEN_CASE(IR_POP,
+            STB_LANG_ARM_POP();
+        )
+        STB_LANG_CODEGEN_CASE(IR_CALL,
+            STB_LANG_ARM_FUNCALL();
+        )
+        STB_LANG_CODEGEN_CASE(IR_ASSIGN_REG,
+            STB_LANG_ARM_ASSIGN_REG(IR_REG, IR_INT, IR_VAR);
         )
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
             STB_LANG_ARM_EPILOGUE();
@@ -224,7 +259,7 @@ int main(int argc, char **argv){
     }
     // int len = tokenizer->tokens.datalen;
     // for (int i=0; i<len; i++){
-    //     printf("%d\n", tokenizer->tokens.data[i].type);
+    //     printf("%d, %s\n", tokenizer->tokens.data[i].type, tokenizer->tokens.data[i].value);
     // }
     
 

@@ -96,13 +96,15 @@ int STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_from_symbols)(STB_CONCAT3(dymar
 exit: \
     return 0; \
 } \
-int STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) scope, char *query, STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *_new){ \
+int STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) scope, char *query, STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) **_new){ \
+\
+    \
     if (query == NULL) {goto exit;} \
     for (int i=0; i<scope.children.datalen; i++){\
         STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *a = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope.children.data[i]; \
-        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) scope1 = *((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope.children.data[i]); \
-        if (scope1.name != NULL){ \
-            if (strcmp(scope1.name, query) == 0){ \
+        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope1 = ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope.children.data[i]); \
+        if (scope1->name != NULL){ \
+            if (strcmp(scope1->name, query) == 0){ \
                 if (_new != NULL) \
                     *_new = scope1; \
                 return 1; \
@@ -151,6 +153,8 @@ while (_params != NULL){ \
     STB_LANG_SYMBOL(_params); \
     _params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_params->next; \
 }}while(0);
+
+
 #define STB_LANG_EXPAND_BLOCK() do {\
 STB_CONCAT(CUR_PARSER_NAME, _AST) *_block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->right; \
 while (_block != NULL){ \
