@@ -71,6 +71,7 @@ typedef struct { \
     int cursor; \
     \
     int entry_offset; \
+    STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
 }CUR_TYPEINFO_NAME; \
 STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) paren, char *name){ \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scope = malloc(sizeof(*scope)); \
@@ -130,6 +131,7 @@ CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parse
     typeinfo->root_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, NULL); \
     typeinfo->current_scope = typeinfo->root_scope; \
     typeinfo->entry_offset = 0; \
+    typeinfo->file = parser->file; \
     return typeinfo; \
 } \
 int a = 0; \
@@ -173,7 +175,7 @@ while (_block != NULL){ \
 #define STB_LANG_EXPAND_RHS() do{ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_RHS(ast));}while(0);
 
 #define STB_LANG_EXPECT_TYPE_EQ(left, right) if (left != NULL && right != NULL){if (left->typeinfo != right->typeinfo){ \
-stb_lang_error_major_global("TypeinfoError", "Expected types to be equal"); \
+stb_lang_error_minor(checker->file.name, checker->file.contents, left->offset, "TypeinfoError", "Expected types to be equal"); \
 }}
 // ^ Yes, the error messages look bad as of right now; I will fix them eventually.
 

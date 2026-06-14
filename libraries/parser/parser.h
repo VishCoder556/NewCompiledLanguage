@@ -71,6 +71,7 @@ typedef struct { \
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *left;\
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *right;\
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *next; \
+    int offset; \
 }STB_CONCAT(CUR_PARSER_NAME, _AST); \
 typedef struct { \
     STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token) tokens; \
@@ -100,6 +101,7 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(CU
     if (parser->cursor >= parser->tokens.datalen) {goto exit;} \
     int Generic; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
+    int offset = token.offset; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
     if (0){}_expr; \
 exit: \
@@ -109,6 +111,7 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_ast)(CUR
     if (parser->cursor >= parser->tokens.datalen) {goto exit;} \
     int Generic; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
+    int offset = token.offset; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
     if (0){}_ast; \
 exit: \
@@ -118,6 +121,7 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_body_ast
     if (parser->cursor >= parser->tokens.datalen) {goto exit;} \
     int Generic; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
+    int offset = token.offset; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
     if (0){}_body; \
 exit: \
@@ -172,6 +176,7 @@ typedef enum { \
     _n->left = NULL; \
     _n->right = NULL; \
     _n->next = NULL; \
+    _n->offset = offset; \
     _n; \
 })
 
@@ -184,6 +189,7 @@ typedef enum { \
     _n->left = NULL; \
     _n->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)eqs; \
     _n->next = NULL; \
+    _n->offset = offset; \
     _n; \
 })
 
@@ -196,6 +202,7 @@ typedef enum { \
     _n->left = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(params, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
     _n->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(block, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
     _n->next = NULL; \
+    _n->offset = offset; \
     _n; \
 })
 
@@ -269,7 +276,7 @@ STB_LANG_PARSE_CUSTOM_LIST(start, split, end, \
         STB_LANG_SAVE(argtype, token); \
         STB_LANG_PARSER_PEEK() \
         STB_LANG_IF_TOKEN(TOKEN_ID, \
-            STB_CONCAT(CUR_PARSER_NAME, _AST) ast = (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type=STB_LANG_AST_TYPEINFO, .typeinfo=argt, .value=match_token.value}; \
+            STB_CONCAT(CUR_PARSER_NAME, _AST) ast = (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type=STB_LANG_AST_TYPEINFO, .typeinfo=argt, .value=match_token.value, .offset=offset}; \
             AppendToLinkedList(into, STB_CONCAT(CUR_PARSER_NAME, _AST), ast); \
         )\
     }\

@@ -7,7 +7,7 @@
 #define STB_LANG_CODEGEN_LIST(...) __VA_ARGS__
 #define STB_LANG_CODEGEN_CASE(typ, ...) else if( instr->type == typ ) {__VA_ARGS__;}
 
-#define STB_LANG_EMIT_CODE(...) STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(gen, __VA_ARGS__);
+#define STB_LANG_EMIT_CODE(...) STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(gen, instr->offset, __VA_ARGS__);
 #define STB_LANG_CODEGEN_REGISTERS(...) __VA_ARGS__
 
 #define STB_LANG_CODEGEN_REGISTER_NAMES(...) __VA_ARGS__
@@ -61,6 +61,7 @@ typedef struct { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) current_scope; \
     STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _Register) *regs; \
+    STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
 }CUR_CODEGEN_NAME; \
 STB_LANG_SIZE_OFFSET(); \
 STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _Register) *STB_CONCAT(CUR_CODEGEN_PREFIX, _regs_init)(){ \
@@ -74,7 +75,7 @@ STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _Register) *STB_CONCAT(CUR_CODEGEN_PREF
 void STB_CONCAT(CUR_CODEGEN_PREFIX, _free_register)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_CODEGEN_NAME, _Reg) reg){ \
     gen->regs->data[(int)reg].available = 1; \
 }; \
-STB_CONCAT(CUR_CODEGEN_NAME, _Reg) STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(CUR_CODEGEN_NAME *gen){ \
+STB_CONCAT(CUR_CODEGEN_NAME, _Reg) STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(CUR_CODEGEN_NAME *gen, int offset){ \
     STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _Register) *dym = gen->regs; \
     for (int i=0; i<dym->datalen; i++){ \
         if (dym->data[i].available == 1){ \
@@ -82,29 +83,29 @@ STB_CONCAT(CUR_CODEGEN_NAME, _Reg) STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_registe
             return (STB_CONCAT(CUR_CODEGEN_NAME, _Reg))i; \
         } \
     } \
-    stb_lang_error_major_global("RegisterError", "Could not allocate a register"); \
+    stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "RegisterError", "Could not allocate a register"); \
     return -1; \
 }; \
 char *STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg_inner)(STB_CONCAT(CUR_CODEGEN_NAME, _Reg) r, int size){ \
     if(0){}matches; \
     return NULL; \
 } \
-char *STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(STB_CONCAT(CUR_CODEGEN_NAME, _Reg) r, int size){ \
+char *STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(CUR_CODEGEN_NAME *gen, int offset, STB_CONCAT(CUR_CODEGEN_NAME, _Reg) r, int size){ \
     char *str = STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg_inner)(r, size); \
     if (str == NULL){ \
-        stb_lang_error_major_global("RegisterError", "Invalid register or size accessed"); \
+        stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "RegisterError", "Invalid register or size accessed"); \
         return NULL; \
     } \
     return str; \
 }; \
-void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, char *str, ...){ \
+void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, int offset, char *str, ...){ \
     va_list args; \
     va_start(args, str); \
     char st[256]; \
     int len = vsnprintf(st, 256, str, args); \
     va_end(args); \
     if (len < 0 || len >= sizeof(st)) { \
-        stb_lang_error_major_global("CodeGenError", "Too large of a buffer is being written at once"); \
+        stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "CodeGenError", "Too large of a buffer is being written at once"); \
         return; \
     } \
     int space = gen->code.datalen + len + 1; \
@@ -116,7 +117,7 @@ void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, char *str,
         gen->code.datacap = cap; \
         gen->code.data = realloc(gen->code.data, gen->code.datacap); \
         if (!gen->code.data){ \
-            stb_lang_error_major_global("CodeGenError", "Not enough memory to store assembly output"); \
+            stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "CodeGenError", "Not enough memory to store assembly output"); \
             return; \
         } \
     } \
@@ -133,12 +134,13 @@ CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_IR_NAME *ir){ \
     gen->root_scope = ir->root_scope; \
     gen->current_scope = gen->root_scope; \
     gen->regs = STB_CONCAT(CUR_CODEGEN_PREFIX, _regs_init)(); \
+    gen->file = ir->file; \
+    STB_CONCAT(CUR_IR_NAME, _Instr) *instr = (gen->instrs.data + gen->cursor); \
  \
     prefix; \
     return gen; \
 } \
 char STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
-    ; \
     if(0){}list; \
     return 0; \
 }; \
@@ -152,9 +154,9 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
     return 0; \
 };
 
-#define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_CODEGEN_NAME, _Reg) reg = STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(gen);
+#define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_CODEGEN_NAME, _Reg) reg = STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(gen, instr->offset);
 
-#define STB_LANG_REGISTER(r, size) STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(r, size)
+#define STB_LANG_REGISTER(r, size) STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(gen, instr->offset, r, size)
 
 #define STB_LANG_FREE_REGISTER(r) STB_CONCAT(CUR_CODEGEN_PREFIX, _free_register)(gen, r)
 

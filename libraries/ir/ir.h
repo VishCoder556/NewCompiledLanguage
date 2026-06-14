@@ -10,7 +10,7 @@
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 5)
 
 #define STB_LANG_IR_EMIT(typ, des, sr) \
-STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .src=sr, .dest=des})
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .src=sr, .dest=des, .offset=offset})
 
 
 #define STB_LANG_IR_BLOCK() do {\
@@ -52,6 +52,7 @@ typedef struct { \
     STB_CONCAT(CUR_IR_NAME, _InstrType) type; \
     char *src; \
     char *dest; \
+    int offset; \
 }STB_CONCAT(CUR_IR_NAME, _Instr); \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_IR_NAME, _Instr));\
 typedef struct { \
@@ -59,6 +60,7 @@ typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *tail; \
     STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr) instrs; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
+    STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
 }CUR_IR_NAME; \
 CUR_IR_NAME *STB_CONCAT(CUR_IR_PREFIX, _init)(CUR_TYPEINFO_NAME *checker){ \
     CUR_IR_NAME *ir = malloc(sizeof(*ir)); \
@@ -66,9 +68,11 @@ CUR_IR_NAME *STB_CONCAT(CUR_IR_PREFIX, _init)(CUR_TYPEINFO_NAME *checker){ \
     ir->tail = ir->head; \
     ir->instrs = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _new)(); \
     ir->root_scope = checker->root_scope; \
+    ir->file = checker->file; \
     return ir; \
 } \
 char *STB_CONCAT(CUR_IR_PREFIX, _ast)(CUR_IR_NAME *ir, STB_CONCAT(CUR_PARSER_NAME, _AST) *ast){ \
+    int offset = ast->offset; \
     if (0){}cases; \
     return NULL; \
 }; \

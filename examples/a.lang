@@ -1,4 +1,4 @@
 int _main(){
-    int a = 300;
+    void a = 300;
     int b = 5;
 }
