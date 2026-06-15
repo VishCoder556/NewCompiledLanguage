@@ -55,6 +55,11 @@ typedef struct{ \
 } STB_CONCAT(CUR_CODEGEN_NAME, _Register); \
 STB_LANG_INVOKE_TYPENEW3(STB_CONCAT(CUR_CODEGEN_NAME, _Register)); \
 typedef struct { \
+    char *virtual; \
+    STB_CONCAT(CUR_CODEGEN_NAME, _Reg) real; \
+}STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister); \
+STB_LANG_INVOKE_TYPENEW3(STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister)); \
+typedef struct { \
     STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr) instrs; \
     int cursor; \
     dymarray_char code; \
@@ -62,6 +67,7 @@ typedef struct { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) current_scope; \
     STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _Register) *regs; \
+    STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _VirtualRegister) *virtual_regs; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
 }CUR_CODEGEN_NAME; \
 STB_LANG_SIZE_OFFSET(); \
@@ -84,7 +90,11 @@ STB_CONCAT(CUR_CODEGEN_NAME, _Reg) STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_registe
             return (STB_CONCAT(CUR_CODEGEN_NAME, _Reg))i; \
         } \
     } \
-    stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "RegisterError", "Could not allocate a register"); \
+    if (offset == -1) { \
+        stb_lang_error_major_global("RegisterError", "Could not allocate a register"); \
+    }else { \
+        stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "RegisterError", "Could not allocate a register"); \
+    } \
     return -1; \
 }; \
 char *STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg_inner)(STB_CONCAT(CUR_CODEGEN_NAME, _Reg) r, int size){ \
@@ -126,6 +136,37 @@ void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, int offset
     gen->code.datalen += len; \
     ((char*)gen->code.data)[gen->code.datalen] = '\0'; \
 } \
+STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_init)(CUR_CODEGEN_NAME *gen, char *virtual, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
+    STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) vreg; \
+    STB_LANG_ALLOC_REGISTER(real); \
+    vreg.real = real; \
+    vreg.virtual = virtual; \
+    STB_CONCAT(STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _VirtualRegister), _add)(gen->virtual_regs, vreg); \
+    return vreg; \
+}; \
+STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_find)(CUR_CODEGEN_NAME *gen, char *virtual, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
+    for (int i=0; i<gen->virtual_regs->datalen; i++){ \
+        if (strcmp(gen->virtual_regs->data[i].virtual, virtual) == 0){ \
+            return gen->virtual_regs->data[i]; \
+        }; \
+    }; \
+    if (instr != NULL){ \
+        stb_lang_error_minor(gen->file.name, gen->file.contents, instr->offset, "RegisterError", "Could not find virtual register"); \
+    } \
+    stb_lang_error_major_global("RegisterError", "Could not find virtual register"); \
+    return (STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister)){0}; \
+}; \
+STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_init_find)(CUR_CODEGEN_NAME *gen, char *virtual){ \
+    for (int i=0; i<gen->virtual_regs->datalen; i++){ \
+        if (strcmp(gen->virtual_regs->data[i].virtual, virtual) == 0){ \
+            return gen->virtual_regs->data[i]; \
+        }; \
+    }; \
+    return STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_init)(gen, virtual, NULL); \
+}; \
+void STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_free)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) virtual){ \
+    STB_LANG_FREE_REGISTER(virtual.real); \
+}; \
 CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_IR_NAME *ir){ \
     CUR_CODEGEN_NAME *gen = malloc(sizeof(*gen)); \
     gen->code = dymarray_char_new(); \
@@ -135,6 +176,8 @@ CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_IR_NAME *ir){ \
     gen->root_scope = ir->root_scope; \
     gen->current_scope = gen->root_scope; \
     gen->regs = STB_CONCAT(CUR_CODEGEN_PREFIX, _regs_init)(); \
+    gen->virtual_regs = malloc(sizeof(*gen->virtual_regs)); \
+    *gen->virtual_regs = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_CODEGEN_NAME, _VirtualRegister), _new)(); \
     gen->file = ir->file; \
     STB_CONCAT(CUR_IR_NAME, _Instr) *instr = (gen->instrs.data + gen->cursor); \
  \
@@ -155,7 +198,7 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
     return 0; \
 };
 
-#define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_CODEGEN_NAME, _Reg) reg = STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(gen, instr->offset);
+#define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_CODEGEN_NAME, _Reg) reg; if (instr == NULL){reg = STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(gen, -1);}else {reg = STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(gen, instr->offset);}
 
 #define STB_LANG_REGISTER(r, size) STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(gen, instr->offset, r, size)
 
@@ -170,8 +213,6 @@ STB_LANG_EMIT_CODE("\tmov x29, sp\n"); \
 STB_LANG_EMIT_CODE("\tsub sp, sp, #32\n"); \
 STB_LANG_GO_TO_FUNC(instr->dest->value);
 
-// #define 
-// STB_CONCAT(CUR_CODEGEN_PREFIX, _register_from_reg)(STB_CONCAT(CUR_CODEGEN_PREFIX, _alloc_register)(CUR_CODEGEN_NAME *gen))
 
 #define STB_LANG_X86_64_PROLOGUE() \
 STB_LANG_EMIT_CODE("%s:\n", instr->dest->value); \
@@ -192,61 +233,78 @@ STB_LANG_EMIT_CODE("\tpop rbp\n"); \
 STB_LANG_EMIT_CODE("\tret\n");
 
 #define STB_LANG_CODEGEN_ASSIGN()\
-int size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->src->value); \
-int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value);
+int size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->dest->value); \
+int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value);
 
 #define STB_LANG_ARM_ASSIGN(lit, var) \
 if (instr->dest->type == var){ \
     STB_LANG_CODEGEN_ASSIGN();  \
     STB_LANG_ALLOC_REGISTER(freg); \
     if (size == 4) { \
-        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 4), instr->src->value); \
+        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 4), instr->left->value); \
         STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 4), offset); \
     }  \
     else if (size == 8) { \
-        if (instr->src->type == var){ \
+        if (instr->left->type == var){ \
             int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value); \
             STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 8), newoffset); \
-        }else if(instr->src->type == lit){ \
-            STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 8), instr->src->value); \
+        }else if(instr->left->type == lit){ \
+            STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(freg, 8), instr->left->value); \
         } \
-        STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 4), offset); \
+        STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(freg, 8), offset); \
     } \
     STB_LANG_FREE_REGISTER(freg); \
 }else if (instr->dest->value[0] == 'a'){ \
     int r = atoi(instr->dest->value+1); \
-    if (instr->src->type == var){ \
-        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value); \
+    if (instr->left->type == var){ \
+        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value); \
         STB_LANG_EMIT_CODE("\tstr x%d, [sp, #%d]\n", r, newoffset); \
-    }else if(instr->dest->type == lit){ \
-        STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->src->value); \
+    }else if(instr->left->type == lit){ \
+        STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->left->value); \
     } \
-} \
+}
 
 #define STB_LANG_ARM_ASSIGN_REG(reg, lit, var) \
 if (instr->dest->type == reg && instr->dest->value[0] == 'a'){ \
     int r = atoi(instr->dest->value+1); \
-    if (instr->src->type == lit) { \
-        STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->src->value); \
-    }else if (instr->src->type == var){ \
-        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value); \
-        STB_LANG_EMIT_CODE("\tldr x%d, [sp, #%d]\n", r, newoffset); \
+    if (instr->left != NULL){ \
+        if (instr->left->type == lit) { \
+            STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->left->value); \
+        }else if (instr->left->type == var){ \
+            int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value); \
+            STB_LANG_EMIT_CODE("\tldr x%d, [sp, #%d]\n", r, newoffset); \
+        }else if (instr->left->type == reg) { \
+            STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) vreg = STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_init_find)(gen, instr->left->value); \
+            STB_LANG_EMIT_CODE("\tmov x%d, %s\n", r, STB_LANG_REGISTER(vreg.real, 8)); \
+        } \
     } \
-}
+} \
 
 
 #define STB_LANG_ARM_FUNCALL() \
 STB_LANG_EMIT_CODE("\tbl %s\n", instr->dest->value);
 
+#define STB_LANG_ARM_MOVE(reg, lit, var, right, ...) {\
+char *leftr = __VA_ARGS__; \
+if (leftr[0] == 't'){ \
+    STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) vreg = STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_init)(gen, instr->dest->value, instr); \
+    leftr = STB_LANG_REGISTER(vreg.real, 8); \
+} \
+if (right->type == lit) { \
+    STB_LANG_EMIT_CODE("\tmov %s, #%s\n", leftr, right->value); \
+}else if(right->type == var){ \
+    int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, right->value); \
+    STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, newoffset); \
+}else if (right->type == reg){ \
+    STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) _vreg = STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_find)(gen, right->value, NULL); \
+    STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_REGISTER(_vreg.real, 8)); \
+    STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_free)(gen, _vreg); \
+} \
+}
 
-#define STB_LANG_ARM_PUSH(lit, var) \
+#define STB_LANG_ARM_PUSH(lit, var, reg) \
     STB_LANG_ALLOC_REGISTER(pushreg); \
-    if (instr->dest->type == lit) { \
-        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(pushreg, 8), instr->src->value); \
-    }else if(instr->dest->type == var){ \
-        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->src->value); \
-        STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", STB_LANG_REGISTER(pushreg, 8), newoffset); \
-    } \
+    STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(pushreg, 8)); \
     STB_LANG_EMIT_CODE("\tstr %s, [sp, #-16]!\n", STB_LANG_REGISTER(pushreg, 8)); \
     STB_LANG_FREE_REGISTER(pushreg);
 
@@ -286,6 +344,53 @@ STB_LANG_CODEGEN_REGISTER_NAMES( \
 #define STB_LANG_ARM_PREFIX \
 STB_LANG_EMIT_CODE("%s\n", ".global _main"); \
 STB_LANG_EMIT_CODE("%s\n", ".align 2");
+
+
+#define STB_LANG_ARM_BINARY_IMM(op, reg, lit, var) \
+if (instr->dest->type == reg) { \
+    STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) vreg = STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_init)(gen, instr->dest->value, instr); \
+\
+    if (instr->right->type == lit){ \
+        STB_LANG_ALLOC_REGISTER(left); \
+        STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(left, 8)); \
+    \
+        STB_LANG_EMIT_CODE("\t%s %s, %s, #%s\n", op, STB_LANG_REGISTER(vreg.real, 8), STB_LANG_REGISTER(left, 8), instr->right->value); \
+        STB_LANG_FREE_REGISTER(left); \
+    }else if(instr->right->type == var){ \
+        STB_LANG_ALLOC_REGISTER(left); \
+        STB_LANG_ALLOC_REGISTER(right); \
+        STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(left, 8)); \
+        STB_LANG_ARM_MOVE(reg, lit, var, instr->right, STB_LANG_REGISTER(right, 8)); \
+    \
+        STB_LANG_EMIT_CODE("\t%s %s, %s, %s\n", op, STB_LANG_REGISTER(vreg.real, 8), STB_LANG_REGISTER(left, 8), STB_LANG_REGISTER(right, 8)); \
+        STB_LANG_FREE_REGISTER(left); \
+        STB_LANG_FREE_REGISTER(right); \
+    }else if(instr->right->type == reg){ \
+        STB_LANG_ALLOC_REGISTER(left); \
+        STB_LANG_ALLOC_REGISTER(right); \
+        STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(left, 8)); \
+        STB_LANG_ARM_MOVE(reg, lit, var,  instr->right, STB_LANG_REGISTER(right, 8)); \
+        STB_LANG_EMIT_CODE("\t%s %s, %s, %s\n", op, STB_LANG_REGISTER(vreg.real, 8), STB_LANG_REGISTER(left, 8), STB_LANG_REGISTER(right, 8)); \
+        STB_LANG_FREE_REGISTER(left); \
+        STB_LANG_FREE_REGISTER(right); \
+    } \
+} \
+
+#define STB_LANG_ARM_BINARY_REG(op, reg, lit, var) \
+if (instr->dest->type == reg) { \
+    STB_CONCAT(CUR_CODEGEN_NAME, _VirtualRegister) vreg = STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_init)(gen, instr->dest->value, instr); \
+\
+        STB_LANG_ALLOC_REGISTER(left); \
+        STB_LANG_ALLOC_REGISTER(right); \
+        STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(left, 8)); \
+        STB_LANG_ARM_MOVE(reg, lit, var, instr->right, STB_LANG_REGISTER(right, 8)); \
+    \
+        STB_LANG_EMIT_CODE("\t%s %s, %s, %s\n", op, STB_LANG_REGISTER(vreg.real, 8), STB_LANG_REGISTER(left, 8), STB_LANG_REGISTER(right, 8)); \
+        STB_LANG_FREE_REGISTER(left); \
+        STB_LANG_FREE_REGISTER(right); \
+    \
+}
+    // STB_CONCAT(CUR_CODEGEN_PREFIX, _virtual_reg_free)(gen, vreg); \
 
 
 #define STB_LANG_CODEGEN_PREFIX(...) __VA_ARGS__

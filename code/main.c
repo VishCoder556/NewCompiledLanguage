@@ -37,7 +37,11 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_ID,
         TOKEN_NUM,
         TOKEN_COMMA,
-        TOKEN_EQ
+        TOKEN_EQ,
+        TOKEN_ADD,
+        TOKEN_SUB,
+        TOKEN_MUL,
+        TOKEN_DIV,
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
@@ -46,6 +50,10 @@ STB_LANG_NEW_TOKENIZER(
         STB_LANG_TOKEN_CHAR('}', TOKEN_RB)
         STB_LANG_TOKEN_CHAR(',', TOKEN_COMMA)
         STB_LANG_TOKEN_CHAR('=', TOKEN_EQ)
+        STB_LANG_TOKEN_CHAR('+', TOKEN_ADD)
+        STB_LANG_TOKEN_CHAR('-', TOKEN_SUB)
+        STB_LANG_TOKEN_CHAR('*', TOKEN_MUL)
+        STB_LANG_TOKEN_CHAR('/', TOKEN_DIV)
 
         STB_LANG_SKIP('\n')
     ),
@@ -78,13 +86,23 @@ STB_LANG_TYPEINFO_SIZE(
 #define CUR_PARSER_PREFIX lang_parser
 
 STB_LANG_NEW_PARSER(
+STB_LANG_BINDING_POWER(
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_ADD, 10)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_SUB, 10)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_MUL, 20)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_DIV, 20)
+),
 STB_LANG_ASTS(
     AST_FUNCDEF,
     AST_VAR,
     AST_INT,
     AST_ASSIGN,
     AST_DECL,
-    AST_FUNCALL
+    AST_FUNCALL,
+    AST_ADD,
+    AST_SUB,
+    AST_MUL,
+    AST_DIV
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_MATCH_TOKEN(TOKEN_ID, 
@@ -110,7 +128,7 @@ STB_LANG_PARSE_AST(
             STB_LANG_SAVE(varia, match_token)
             STB_LANG_IF_TOKEN(TOKEN_EQ,
                 STB_LANG_PARSER_ADVANCE();
-                STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser));
+                STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser, 0));
                 return STB_LANG_AST_ASSIGN_DECL(AST_ASSIGN, AST_DECL, typeinfo, varia, assign);
             ) STB_LANG_ELSE_IF_TOKEN(TOKEN_LP,
                 STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
@@ -123,10 +141,16 @@ STB_LANG_PARSE_AST(
 ),
 STB_LANG_PARSE_EXPR(
     STB_LANG_MATCH_TOKEN(TOKEN_ID,  
-        return STB_LANG_AST_LITERAL(AST_VAR, match_token);
+        left = STB_LANG_AST_LITERAL(AST_VAR, match_token);
     )
     STB_LANG_MATCH_TOKEN(TOKEN_NUM,  
-        return STB_LANG_AST_LITERAL(AST_INT, match_token);
+        left = STB_LANG_AST_LITERAL(AST_INT, match_token);
+    )
+    STB_LANG_PRATT_PARSER(
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_ADD, AST_ADD)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_SUB, AST_SUB)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_MUL, AST_MUL)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_DIV, AST_DIV)
     )
 )
 )
@@ -143,6 +167,18 @@ STB_LANG_NEW_TYPEINFO(
     }
     STB_LANG_TYPEINFO_CASE(AST_INT){
         STB_LANG_TYPEINFO_ASSUME_TYPE(AST_TYPE_INT);
+    }
+    STB_LANG_TYPEINFO_CASE(AST_ADD){
+        STB_LANG_TYPEINFO_BINARY("add operation");
+    }
+    STB_LANG_TYPEINFO_CASE(AST_SUB){
+        STB_LANG_TYPEINFO_BINARY("subtraction operation")
+    }
+    STB_LANG_TYPEINFO_CASE(AST_MUL){
+        STB_LANG_TYPEINFO_BINARY("multiplication operation")
+    }
+    STB_LANG_TYPEINFO_CASE(AST_DIV){
+        STB_LANG_TYPEINFO_BINARY("division operation")
     }
     STB_LANG_TYPEINFO_CASE(AST_FUNCALL){
         // Not implemented yet
@@ -166,7 +202,11 @@ STB_LANG_NEW_IR(
         IR_POP, // pop the stack
         IR_PUSH,
         IR_CALL,
-        IR_ASSIGN_REG
+        IR_ASSIGN_REG,
+        IR_ADD,
+        IR_SUB,
+        IR_MUL,
+        IR_DIV
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
@@ -186,6 +226,18 @@ STB_LANG_NEW_IR(
         )
         STB_LANG_IR_CASE(AST_FUNCALL,
             STB_LANG_IR_FUNCALL(IR_VAR, IR_CALL, IR_ASSIGN_REG, IR_REG);
+        )
+        STB_LANG_IR_CASE(AST_ADD,
+            STB_LANG_IR_BINARY(IR_ADD, IR_REG);
+        )
+        STB_LANG_IR_CASE(AST_SUB,
+            STB_LANG_IR_BINARY(IR_SUB, IR_REG);
+        )
+        STB_LANG_IR_CASE(AST_MUL,
+            STB_LANG_IR_BINARY(IR_MUL, IR_REG);
+        )
+        STB_LANG_IR_CASE(AST_DIV,
+            STB_LANG_IR_BINARY(IR_DIV, IR_REG);
         )
     )
 );
@@ -210,7 +262,7 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_ARM_DECLARE(IR_INT, IR_VAR);
         )
         STB_LANG_CODEGEN_CASE(IR_PUSH,
-            STB_LANG_ARM_PUSH(IR_INT, IR_VAR);
+            STB_LANG_ARM_PUSH(IR_REG, IR_INT, IR_VAR);
         )
         STB_LANG_CODEGEN_CASE(IR_POP,
             STB_LANG_ARM_POP();
@@ -224,6 +276,18 @@ STB_LANG_NEW_CODEGEN(
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
             STB_LANG_ARM_EPILOGUE();
         )
+        STB_LANG_CODEGEN_CASE(IR_ADD,
+            STB_LANG_ARM_BINARY_IMM("add", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_SUB,
+            STB_LANG_ARM_BINARY_IMM("sub", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_MUL,
+            STB_LANG_ARM_BINARY_REG("mul", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_DIV,
+            STB_LANG_ARM_BINARY_REG("sdiv", IR_REG, IR_INT, IR_VAR)
+        )
     )
 );
 
@@ -233,9 +297,9 @@ STB_LANG_NEW_DRIVER(
     char *asm_path = "res/main.s";
     char *obj_path = "res/main.o";
     char *exec_path = "res/main.out";
-    STB_LANG_DRIVER_WRITE_DATA(asm_path)
-    STB_LANG_DRIVER_RUN_SCRIPT("clang -c %s -o %s", asm_path, obj_path)
-    STB_LANG_DRIVER_RUN_SCRIPT("clang -O0 -fno-stack-protector -fno-common -fno-exceptions -arch arm64 %s -o %s -e _main -Wl,-w -Wl,-platform_version,macos,11.0,11.0 -lc", obj_path, exec_path)
+    STB_LANG_DRIVER_WRITE_DATA(asm_path);
+    STB_LANG_DRIVER_RUN_SCRIPT("clang -c %s -o %s", asm_path, obj_path);
+    STB_LANG_DRIVER_RUN_SCRIPT("clang -O0 -fno-stack-protector -fno-common -fno-exceptions -arch arm64 %s -o %s -e _main -Wl,-w -Wl,-platform_version,macos,11.0,11.0 -lc", obj_path, exec_path);
 );
 
 int main(int argc, char **argv){
@@ -275,7 +339,7 @@ int main(int argc, char **argv){
     Lang_TypeInfo *typeinfo = lang_typeinfo_init(parser);
     while (lang_typeinfo_check(typeinfo) == 0){
     }
-    free(parser);
+
 
     Lang_IR *ir = lang_ir_init(typeinfo);
     while (lang_ir_translate(ir) == 0){
