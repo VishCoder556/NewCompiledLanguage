@@ -19,12 +19,12 @@
 #define STB_CONCAT(a, b) STB_CONCAT_EVAL(a, b)
 #define STB_CONCAT3(a, b, c) STB_CONCAT3_EVAL(a, b, c)
 
-#define STB_LANG_ERROR_FALLOUT(where) stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ParserError", "Could not parse %s", where)
+#define STB_LANG_PARSER_ERROR_FALLOUT(where) stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ParserError", "Could not parse %s", where)
 
 #define STB_LANG_ASTS(...) __VA_ARGS__
-#define STB_LANG_PARSE_BODY(...) __VA_ARGS__; STB_LANG_ERROR_FALLOUT("body statement");
-#define STB_LANG_PARSE_AST(...) __VA_ARGS__; STB_LANG_ERROR_FALLOUT("statement");
-#define STB_LANG_PARSE_EXPR(...) __VA_ARGS__;STB_LANG_ERROR_FALLOUT("expression"); 
+#define STB_LANG_PARSE_BODY(...) __VA_ARGS__; STB_LANG_PARSER_ERROR_FALLOUT("body statement");
+#define STB_LANG_PARSE_AST(...) __VA_ARGS__; STB_LANG_PARSER_ERROR_FALLOUT("statement");
+#define STB_LANG_PARSE_EXPR(...) __VA_ARGS__;STB_LANG_PARSER_ERROR_FALLOUT("expression"); 
 #define STB_LANG_BINDING_POWER(...) __VA_ARGS__
 #define STB_LANG_MATCH_BINDING_POWER(t, v) case t: return v;
 
@@ -63,7 +63,7 @@ if (token.type != typ){ \
 
 
 #define STB_LANG_PRATT_PARSER(...) \
-if (left == NULL) { return NULL; } \
+if (left == NULL) { STB_LANG_PARSER_ERROR_FALLOUT("expression"); } \
 while (parser->cursor < parser->tokens.datalen) { \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) next_tok = parser->tokens.data[parser->cursor]; \
     int next_bp = STB_CONCAT(CUR_PARSER_PREFIX, _binding_power)(next_tok.type); \

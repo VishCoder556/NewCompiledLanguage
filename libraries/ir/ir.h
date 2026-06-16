@@ -11,7 +11,7 @@
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 5)
 
 #define STB_LANG_IR_EMIT(typ, des, lef, righ) \
-STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .left=lef, .right=righ, .dest=des, .offset=offset})
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .left=lef, .right=righ, .dest=des, .offset=offset, .phys1=-1, .phys2=-1})
 
 
 #define STB_LANG_IR_BLOCK() do {\
@@ -52,6 +52,8 @@ while (_args != NULL){ \
     STB_CONCAT(CUR_IR_NAME, _Operand) *op = malloc(sizeof(*op)); \
     op->type = typ; \
     op->value = val; \
+    op->phys = -1; \
+    op->isLast = -1; \
     op; \
 })
 
@@ -86,6 +88,8 @@ typedef enum{operands}STB_CONCAT(CUR_IR_NAME, _OperandType); \
 typedef struct { \
     STB_CONCAT(CUR_IR_NAME, _OperandType) type; \
     char *value; \
+    int phys; \
+    int isLast; \
 }STB_CONCAT(CUR_IR_NAME, _Operand); \
 typedef enum{types}STB_CONCAT(CUR_IR_NAME, _InstrType); \
 typedef struct { \
@@ -94,6 +98,9 @@ typedef struct { \
     STB_CONCAT(CUR_IR_NAME, _Operand) *right; \
     STB_CONCAT(CUR_IR_NAME, _Operand) *dest; \
     int offset; \
+    ; \
+    int phys1; \
+    int phys2; \
 }STB_CONCAT(CUR_IR_NAME, _Instr); \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_IR_NAME, _Instr));\
 typedef struct { \
@@ -121,7 +128,9 @@ CUR_IR_NAME *STB_CONCAT(CUR_IR_PREFIX, _init)(CUR_TYPEINFO_NAME *checker){ \
 } \
 STB_CONCAT(CUR_IR_NAME, _Operand) *STB_CONCAT(CUR_IR_PREFIX, _ast)(CUR_IR_NAME *ir, STB_CONCAT(CUR_PARSER_NAME, _AST) *ast){ \
     int offset = ast->offset; \
-    if (0){}cases; \
+    if (0){}cases else { \
+        stb_lang_error_minor(ir->file.name, ir->file.contents, ast->offset, "IRError", "Could not convert ast with type '%d' into IR", ast->type); \
+    }; \
     return NULL; \
 }; \
 char STB_CONCAT(CUR_IR_PREFIX, _translate)(CUR_IR_NAME *ir){ \

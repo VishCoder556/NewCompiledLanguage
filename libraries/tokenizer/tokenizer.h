@@ -61,6 +61,26 @@ STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer-
         val[vallen++] = '\0'; tokenizer->cursor--; \
         STB_LANG_ADD_TOKEN(.type = typ, .value=val); break; \
     }
+#define STB_LANG_STRING(ch, typ) \
+if (c == ch){ \
+    int valcap = 100, vallen = 0; \
+    char *val = malloc(valcap); \
+    if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1){break;}; \
+    c = tokenizer->file.contents[tokenizer->cursor]; \
+    while (c != ch){ \
+        if (vallen >= valcap - 1){ \
+            valcap += 32; \
+            val = realloc(val, valcap); \
+        } \
+        val[vallen++] = c; \
+        if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1){break;}; \
+        c = tokenizer->file.contents[tokenizer->cursor]; \
+    }; \
+    val[vallen++] = '\0';\
+    STB_LANG_ADD_TOKEN(.type = typ, .value=val); break; \
+}
+
+
 #define STB_LANG_SKIP(ch) case ch: break;
 #define STB_LANG_TOKENS(...) __VA_ARGS__
 

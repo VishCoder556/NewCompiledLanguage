@@ -138,7 +138,12 @@ CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parse
 } \
 int a = 0; \
 void STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(CUR_TYPEINFO_NAME *checker, STB_CONCAT(CUR_PARSER_NAME, _AST) *ast) { \
-    if (0){} __VA_ARGS__; \
+    if (ast == NULL){ \
+        stb_lang_error_major_global("ParserError", "Found unidentified AST"); \
+    } \
+    if (0){} __VA_ARGS__ else { \
+        stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "TypecheckerError", "Could not typecheck ast with type '%d'", ast->type); \
+    }; \
 } \
 char STB_CONCAT(CUR_TYPEINFO_PREFIX, _check)(CUR_TYPEINFO_NAME *checker) { \
     if (checker->tail == NULL){return -1;} \
@@ -151,6 +156,14 @@ char STB_CONCAT(CUR_TYPEINFO_PREFIX, _check)(CUR_TYPEINFO_NAME *checker) { \
 STB_CONCAT(CUR_PARSER_NAME, _AST) *_params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
 while (_params != NULL){ \
     STB_LANG_SYMBOL(_params); \
+    _params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_params->next; \
+}}while(0);
+
+
+#define STB_LANG_EXPAND_ARGS() do {\
+STB_CONCAT(CUR_PARSER_NAME, _AST) *_params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
+while (_params != NULL){ \
+    STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, _params); \
     _params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_params->next; \
 }}while(0);
 
@@ -201,8 +214,13 @@ STB_LANG_MAKE_SCOPE(ast->value); \
 STB_LANG_EXPAND_PARAMS(); \
 STB_LANG_EXPAND_BLOCK();
 
+
+#define STB_LANG_TYPEINFO_FUNCALL() \
+STB_LANG_EXPAND_ARGS();
+
 #define STB_LANG_TYPEINFO_BINARY(op) \
 STB_LANG_EXPAND_RHS(); \
-STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
+STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo); \
+STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast))
 
 #endif

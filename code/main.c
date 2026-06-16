@@ -20,6 +20,7 @@
 #include "../libraries/ir/ir.h"
 #include "../libraries/codegen/codegen.h"
 #include "../libraries/driver/driver.h"
+#include "../libraries/regalloc/regalloc.h"
 
 char *HELP = "New Programming Language HELP Manual\n\t"
 "-help: creates this page\n";
@@ -42,6 +43,7 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_SUB,
         TOKEN_MUL,
         TOKEN_DIV,
+        TOKEN_STRING
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
@@ -59,6 +61,7 @@ STB_LANG_NEW_TOKENIZER(
     ),
     STB_LANG_ALPHA(TOKEN_ID)
     STB_LANG_NUM(TOKEN_NUM)
+    STB_LANG_STRING('"', TOKEN_STRING)
     STB_LANG_SKIP(' ')
 )
 
@@ -68,7 +71,7 @@ STB_LANG_NEW_TOKENIZER(
 #define CUR_TYPEINFO_PREFIX lang_typeinfo
 STB_LANG_DEFINE_TYPEINFO(
     AST_TYPE_VOID,
-    AST_TYPE_INT
+    AST_TYPE_INT,
 )
 STB_LANG_TYPEINFO(
     STB_LANG_MATCH_TYPEINFO("void", AST_TYPE_VOID)
@@ -165,6 +168,8 @@ STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_DECL){
         STB_LANG_TYPEINFO_DECL()
     }
+    STB_LANG_TYPEINFO_CASE(AST_VAR){
+    }
     STB_LANG_TYPEINFO_CASE(AST_INT){
         STB_LANG_TYPEINFO_ASSUME_TYPE(AST_TYPE_INT);
     }
@@ -181,6 +186,7 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_TYPEINFO_BINARY("division operation")
     }
     STB_LANG_TYPEINFO_CASE(AST_FUNCALL){
+        STB_LANG_TYPEINFO_FUNCALL();
         // Not implemented yet
     }
 )
@@ -242,11 +248,54 @@ STB_LANG_NEW_IR(
     )
 );
 
+#define CUR_REGALLOC_NAME Lang_RegAlloc
+#define CUR_REGALLOC_PREFIX lang_regalloc
+STB_LANG_NEW_REGALLOC(
+    STB_LANG_ARM_REGISTERS(),
+    STB_LANG_ARM_REGISTER_MAPS(),
+    STB_LANG_REGALLOC_LIST(
+        STB_LANG_REGALLOC_CASE(IR_FUNCDEF_BEGIN,
+        )
+        STB_LANG_REGALLOC_CASE(IR_FUNCDEF_END,
+        )
+        STB_LANG_REGALLOC_CASE(IR_ASSIGN,
+            STB_LANG_REGALLOC_ASSIGN(IR_REG, IR_VAR)
+        )
+        STB_LANG_REGALLOC_CASE(IR_DECL,
+            STB_LANG_REGALLOC_DECLARE(IR_REG, IR_VAR)
+        )
+        STB_LANG_REGALLOC_CASE(IR_ASSIGN_REG,
+            STB_LANG_REGALLOC_ASSIGN_REG(IR_REG)
+        )
+
+        STB_LANG_REGALLOC_CASE(IR_PUSH,
+            STB_LANG_REGALLOC_PUSH(IR_REG)
+        )
+        STB_LANG_REGALLOC_CASE(IR_POP,
+        )
+
+        STB_LANG_REGALLOC_CASE(IR_ADD,
+            STB_LANG_REGALLOC_BINARY(IR_REG)
+        )
+        STB_LANG_REGALLOC_CASE(IR_SUB,
+            STB_LANG_REGALLOC_BINARY(IR_REG)
+        )
+        STB_LANG_REGALLOC_CASE(IR_MUL,
+            STB_LANG_REGALLOC_BINARY(IR_REG)
+        )
+        STB_LANG_REGALLOC_CASE(IR_DIV,
+            STB_LANG_REGALLOC_BINARY(IR_REG)
+        )
+
+        STB_LANG_REGALLOC_CASE(IR_CALL,
+        )
+    ),
+    STB_LANG_REGALLOC_OPERAND(IR_REG)
+)
+
 #define CUR_CODEGEN_NAME Lang_CodeGen
 #define CUR_CODEGEN_PREFIX lang_codegen
 STB_LANG_NEW_CODEGEN(
-    STB_LANG_ARM_REGISTERS(),
-    STB_LANG_ARM_REGISTER_MAPS(),
     STB_LANG_CODEGEN_PREFIX(
         STB_LANG_ARM_PREFIX
     ),
@@ -256,10 +305,10 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_ARM_PROLOGUE();
         )
         STB_LANG_CODEGEN_CASE(IR_ASSIGN,
-            STB_LANG_ARM_ASSIGN(IR_INT, IR_VAR);
+            STB_LANG_ARM_ASSIGN(IR_REG, IR_INT, IR_VAR);
         )
         STB_LANG_CODEGEN_CASE(IR_DECL,
-            STB_LANG_ARM_DECLARE(IR_INT, IR_VAR);
+            STB_LANG_ARM_DECLARE(IR_REG, IR_INT, IR_VAR);
         )
         STB_LANG_CODEGEN_CASE(IR_PUSH,
             STB_LANG_ARM_PUSH(IR_REG, IR_INT, IR_VAR);
@@ -277,16 +326,16 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_ARM_EPILOGUE();
         )
         STB_LANG_CODEGEN_CASE(IR_ADD,
-            STB_LANG_ARM_BINARY_IMM("add", IR_REG, IR_INT, IR_VAR)
+            STB_LANG_ARM_BINARY("add", IR_REG, IR_INT, IR_VAR)
         )
         STB_LANG_CODEGEN_CASE(IR_SUB,
-            STB_LANG_ARM_BINARY_IMM("sub", IR_REG, IR_INT, IR_VAR)
+            STB_LANG_ARM_BINARY("sub", IR_REG, IR_INT, IR_VAR)
         )
         STB_LANG_CODEGEN_CASE(IR_MUL,
-            STB_LANG_ARM_BINARY_REG("mul", IR_REG, IR_INT, IR_VAR)
+            STB_LANG_ARM_BINARY("mul", IR_REG, IR_INT, IR_VAR)
         )
         STB_LANG_CODEGEN_CASE(IR_DIV,
-            STB_LANG_ARM_BINARY_REG("sdiv", IR_REG, IR_INT, IR_VAR)
+            STB_LANG_ARM_BINARY("sdiv", IR_REG, IR_INT, IR_VAR)
         )
     )
 );
@@ -345,7 +394,12 @@ int main(int argc, char **argv){
     while (lang_ir_translate(ir) == 0){
     }
 
-    Lang_CodeGen *gen = lang_codegen_init(ir);
+    Lang_RegAlloc *regalloc = lang_regalloc_init(ir);
+    lang_regalloc_backtrace(regalloc);
+    while (lang_regalloc_alloc(regalloc) == 0){
+    }
+
+    Lang_CodeGen *gen = lang_codegen_init(regalloc);
     while (lang_codegen_ir(gen) == 0){
     }
 
