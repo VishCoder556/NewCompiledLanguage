@@ -225,10 +225,13 @@ STB_LANG_EMIT_CODE("%s\n", ".align 2");
 if (instr->dest->type == reg) { \
 \
     STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(instr->phys1, 8)); \
+if (instr->phys2 != -1){ \
     STB_LANG_ARM_MOVE(reg, lit, var, instr->right, STB_LANG_REGISTER(instr->phys2, 8)); \
-\
     STB_LANG_EMIT_CODE("\t%s %s, %s, %s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys1, 8), STB_LANG_REGISTER(instr->phys2, 8)); \
+}else { \
+    STB_LANG_EMIT_CODE("\t%s %s, %s, #%s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys1, 8), instr->right->value); \
 } \
+}
 
 
 

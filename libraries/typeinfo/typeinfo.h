@@ -17,9 +17,6 @@
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 3)
 
-// #define STB_LANG_REGISTER_SYMBOL(nam, typeinf) do {if(typeinf != -1) {STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(checker->symbol_table), (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.name=nam, .typeinfo=typeinf});}}while(0);
-
-// checker->entry_offset = 0;
 #define STB_LANG_ADD_SYMBOL(typeinf, scp, ...) do {if(typeinf != -1) { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = __VA_ARGS__; \
     symbol.offset = checker->entry_offset; \
@@ -197,30 +194,10 @@ stb_lang_error_minor(checker->file.name, checker->file.contents, left->offset, "
 // ^ Yes, the error messages look bad as of right now; I will fix them eventually.
 
 
-#define STB_LANG_TYPEINFO_ASSIGN() \
-STB_LANG_EXPAND_RHS(); \
-STB_LANG_INFER_TYPE(ast->value); \
-STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
-STB_LANG_SYMBOL(ast);
-
-#define STB_LANG_TYPEINFO_DECL() \
-STB_LANG_EXPAND_RHS(); \
-STB_LANG_INFER_TYPE(ast->value); \
-STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast)) \
-STB_LANG_SYMBOL(ast);
-
-#define STB_LANG_TYPEINFO_FUNCDEF() \
-STB_LANG_MAKE_SCOPE(ast->value); \
-STB_LANG_EXPAND_PARAMS(); \
-STB_LANG_EXPAND_BLOCK();
 
 
 #define STB_LANG_TYPEINFO_FUNCALL() \
-STB_LANG_EXPAND_ARGS();
 
 #define STB_LANG_TYPEINFO_BINARY(op) \
-STB_LANG_EXPAND_RHS(); \
-STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo); \
-STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast))
 
 #endif

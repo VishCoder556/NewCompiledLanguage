@@ -59,27 +59,8 @@ while (_args != NULL){ \
 
 #define STB_LANG_IR_RETURN_SELF(type) return STB_LANG_IR_OPERAND_NAME(type, ast->value);
 
-#define STB_LANG_IR_FUNCDEF(optype, begin, assign, reg, end) \
-STB_LANG_IR_EMIT(begin, STB_LANG_IR_OPERAND_NAME(optype, ast->value), NULL, NULL); \
-STB_LANG_IR_PARAMS(assign, reg) \
-STB_LANG_IR_BLOCK() \
-STB_LANG_IR_EMIT(end, STB_LANG_IR_OPERAND_NAME(optype, ast->value), NULL, NULL);
-
-
-#define STB_LANG_IR_FUNCALL(optype, call, opcode, reg) \
-STB_LANG_IR_ARGS(opcode, reg) \
-STB_LANG_IR_EMIT(call, STB_LANG_IR_OPERAND_NAME(optype, ast->value), NULL, NULL);
-
-#define STB_LANG_IR_ASSIGN(optype, code)\
-STB_LANG_IR_EMIT(code, STB_LANG_IR_OPERAND_NAME(optype, ast->value), STB_LANG_IR_RHS(), NULL)
-
-#define STB_LANG_IR_VAR(optype, code)\
-STB_LANG_IR_EMIT(code, STB_LANG_IR_OPERAND_NAME(optype, ast->value), STB_LANG_IR_RHS(), NULL)
-
-#define STB_LANG_IR_BINARY(optype, reg) \
-char *temp_reg = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir); \
-STB_LANG_IR_EMIT(optype, STB_LANG_IR_OPERAND_NAME(reg, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
-return STB_LANG_IR_OPERAND_NAME(reg, temp_reg);
+#define STB_LANG_IR_NEW_TEMP() char *temp_reg = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
+#define STB_LANG_IR_TEMP(reg) STB_LANG_IR_OPERAND_NAME(reg, temp_reg)
 
 
 

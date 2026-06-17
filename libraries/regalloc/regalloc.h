@@ -6,6 +6,7 @@
 
 #define STB_LANG_REGALLOC_LIST(...) __VA_ARGS__
 #define STB_LANG_REGALLOC_CASE(typ, ...) else if( instr->type == typ ) {__VA_ARGS__;}
+#define STB_LANG_REGALLOC_2CASES(typ, typ2, ...) else if( instr->type == typ || instr->type == typ2 ) {__VA_ARGS__;}
 
 #define STB_LANG_REGALLOC_OPERAND_INNER(reg, a) \
 if (instr->a != NULL){ \
@@ -29,7 +30,7 @@ STB_LANG_REGALLOC_OPERAND_INNER(reg, dest); \
 STB_LANG_REGALLOC_OPERAND_INNER(reg, left); \
 STB_LANG_REGALLOC_OPERAND_INNER(reg, right);
 
-#define STB_LANG_NEW_REGALLOC(regtypes, matches, list, _back_code) \
+#define STB_LANG_NEW_REGALLOC(regtypes, matches, list, reg) \
 typedef struct{ \
     char *val; \
 } STB_CONCAT(CUR_REGALLOC_NAME, _Register_BackTrack); \
@@ -141,9 +142,15 @@ CUR_REGALLOC_NAME *STB_CONCAT(CUR_REGALLOC_PREFIX, _init)(CUR_IR_NAME *ir){ \
     return regalloc; \
 } \
 char STB_CONCAT(CUR_REGALLOC_PREFIX, _ir)(CUR_REGALLOC_NAME *regalloc, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
+    STB_LANG_EXPAND_OPERAND(dest, reg); \
+    STB_LANG_EXPAND_OPERAND(left, reg); \
+    STB_LANG_EXPAND_OPERAND(right, reg); \
     if(0){}list else { \
         stb_lang_error_minor(regalloc->file.name, regalloc->file.contents, instr->offset, "RegallocError", "Could not get correct register allocations for instruction '%d'", instr->type); \
     }; \
+    STB_LANG_FREE_OPERAND(dest, reg); \
+    STB_LANG_FREE_OPERAND(left, reg); \
+    STB_LANG_FREE_OPERAND(right, reg); \
     return 0; \
 }; \
 char STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc)(CUR_REGALLOC_NAME *regalloc){ \
@@ -160,7 +167,7 @@ char STB_CONCAT(CUR_REGALLOC_PREFIX, _back)(CUR_REGALLOC_NAME *regalloc){ \
         return -1; \
     } \
     STB_CONCAT(CUR_IR_NAME, _Instr) *instr = (regalloc->instrs.data + regalloc->cursor); \
-    _back_code; \
+    STB_LANG_REGALLOC_OPERAND(reg); \
     regalloc->cursor--; \
     return 0; \
 }; \
@@ -213,16 +220,20 @@ STB_LANG_REGALLOC_REGISTER_NAMES( \
 
 #define STB_LANG_EXPAND_OPERAND(operand, reg) \
 STB_CONCAT(CUR_REGALLOC_NAME, _VirtualRegister) operand; \
+if (instr->operand != NULL) { \
 if (instr->operand->type == reg){ \
     operand = STB_CONCAT(CUR_REGALLOC_PREFIX, _virtual_reg_init_find)(regalloc, instr->operand->value, instr); \
     instr->operand->phys = operand.real; \
+} \
 }
 
 #define STB_LANG_FREE_OPERAND(operand, reg) \
+if (instr->operand != NULL){ \
 if (instr->operand->isLast == 1){ \
     if (instr->operand->type == reg){ \
         STB_LANG_FREE_REGISTER(operand.real); \
     } \
+} \
 }
 
 
@@ -232,54 +243,33 @@ if (instr->operand->isLast == 1){ \
 #define STB_LANG_REGALLOC_RHS() \
 STB_CONCAT(CUR_REGALLOC_PREFIX, _ir)(regalloc, instr->left);
 
-#define STB_LANG_REGALLOC_ASSIGN(reg, var) \
-STB_LANG_EXPAND_OPERAND(left, reg); \
-STB_LANG_EXPAND_OPERAND(dest, reg); \
-if (instr->dest->type == reg){ \
-    if (instr->dest->value[0] == 'a'){ \
-        snprintf(instr->dest->value, 10, "x%d", atoi(instr->dest->value + 1)); \
-    }else { \
-        STB_LANG_ALLOC_REGISTER(freg); \
-        instr->phys1 = (int)freg; \
-        STB_LANG_FREE_REGISTER(freg); \
-    }; \
-}else if (instr->dest->type == var){ \
-    STB_LANG_ALLOC_REGISTER(freg); \
-    instr->phys1 = (int)freg; \
-    STB_LANG_FREE_REGISTER(freg); \
-} \
-STB_LANG_FREE_OPERAND(left, reg); \
-STB_LANG_FREE_OPERAND(dest, reg);
 
 
-#define STB_LANG_REGALLOC_ASSIGN_REG(reg) \
-STB_LANG_EXPAND_OPERAND(left, reg); \
-STB_LANG_FREE_OPERAND(left, reg);
 
-#define STB_LANG_REGALLOC_DECLARE(...) STB_LANG_REGALLOC_ASSIGN(__VA_ARGS__)
+#define STB_LANG_ALLOC_REAL_REGISTER(name, phys) \
+    STB_LANG_ALLOC_REGISTER(name); \
+    instr->phys = (int)name;
 
-#define STB_LANG_REGALLOC_PUSH(re) \
-STB_LANG_EXPAND_OPERAND(left, re); \
-STB_LANG_ALLOC_REGISTER(reg); \
-instr->phys1 = (int)reg; \
-STB_LANG_FREE_REGISTER(reg); \
-STB_LANG_FREE_OPERAND(left, re);
 
-#define STB_LANG_REGALLOC_BINARY(reg) \
-STB_LANG_EXPAND_OPERAND(dest, reg); \
-STB_LANG_EXPAND_OPERAND(left, reg); \
-STB_LANG_EXPAND_OPERAND(right, reg); \
-if (instr->dest->type == reg) { \
-    STB_LANG_ALLOC_REGISTER(left); \
-    STB_LANG_ALLOC_REGISTER(right); \
-    instr->phys1 = (int)left; \
-    instr->phys2 = (int)right; \
-    STB_LANG_FREE_REGISTER(left); \
-    STB_LANG_FREE_REGISTER(right); \
-}; \
-STB_LANG_FREE_OPERAND(left, reg); \
-STB_LANG_FREE_OPERAND(right, reg); \
-STB_LANG_FREE_OPERAND(dest, reg);
+#define STB_LANG_REGALLOC_NEGATE(phys) instr->phys = -1;
+
+
+#define STB_LANG_SAVE_REG(phys, ...) \
+STB_LANG_ALLOC_REAL_REGISTER(name, phys); \
+__VA_ARGS__; \
+STB_LANG_FREE_REGISTER(name);
+
+
+#define STB_LANG_REGALLOC_ARG(place) \
+if (instr->place->value[0] == 'a'){ \
+    snprintf(instr->dest->value, 10, "x%d", atoi(instr->place->value + 1)); \
+}else 
+
+#define STB_LANG_REGALLOC_RESOLVE(place) \
+
+
+
+
 
 
 #endif

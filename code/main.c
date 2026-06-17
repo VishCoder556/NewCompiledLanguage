@@ -160,13 +160,21 @@ STB_LANG_PARSE_EXPR(
 
 STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_FUNCDEF){
-        STB_LANG_TYPEINFO_FUNCDEF();
+        STB_LANG_MAKE_SCOPE(ast->value);
+        STB_LANG_EXPAND_PARAMS();
+        STB_LANG_EXPAND_BLOCK();
     }
     STB_LANG_TYPEINFO_CASE(AST_ASSIGN){
-        STB_LANG_TYPEINFO_ASSIGN()
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_INFER_TYPE(ast->value);
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        STB_LANG_SYMBOL(ast);
     }
     STB_LANG_TYPEINFO_CASE(AST_DECL){
-        STB_LANG_TYPEINFO_DECL()
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_INFER_TYPE(ast->value);
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        STB_LANG_SYMBOL(ast);
     }
     STB_LANG_TYPEINFO_CASE(AST_VAR){
     }
@@ -174,20 +182,27 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_TYPEINFO_ASSUME_TYPE(AST_TYPE_INT);
     }
     STB_LANG_TYPEINFO_CASE(AST_ADD){
-        STB_LANG_TYPEINFO_BINARY("add operation");
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
     }
     STB_LANG_TYPEINFO_CASE(AST_SUB){
-        STB_LANG_TYPEINFO_BINARY("subtraction operation")
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
     }
     STB_LANG_TYPEINFO_CASE(AST_MUL){
-        STB_LANG_TYPEINFO_BINARY("multiplication operation")
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
     }
     STB_LANG_TYPEINFO_CASE(AST_DIV){
-        STB_LANG_TYPEINFO_BINARY("division operation")
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
     }
     STB_LANG_TYPEINFO_CASE(AST_FUNCALL){
-        STB_LANG_TYPEINFO_FUNCALL();
-        // Not implemented yet
+        STB_LANG_EXPAND_ARGS();
     }
 )
 
@@ -216,34 +231,46 @@ STB_LANG_NEW_IR(
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
-            STB_LANG_IR_FUNCDEF(IR_VAR, IR_FUNCDEF_BEGIN, IR_ASSIGN, IR_REG, IR_FUNCDEF_END)
+            STB_LANG_IR_EMIT(IR_FUNCDEF_BEGIN, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
+            STB_LANG_IR_PARAMS(IR_ASSIGN, IR_REG)
+            STB_LANG_IR_BLOCK()
+            STB_LANG_IR_EMIT(IR_FUNCDEF_END, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
         )
         STB_LANG_IR_CASE(AST_ASSIGN,
-            STB_LANG_IR_ASSIGN(IR_VAR, IR_ASSIGN);
+            STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), STB_LANG_IR_RHS(), NULL);
         )
         STB_LANG_IR_CASE(AST_VAR,
             STB_LANG_IR_RETURN_SELF(IR_VAR);
         )
         STB_LANG_IR_CASE(AST_DECL,
-            STB_LANG_IR_ASSIGN(IR_VAR, IR_DECL);
+            STB_LANG_IR_EMIT(IR_DECL, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), STB_LANG_IR_RHS(), NULL);
         )
         STB_LANG_IR_CASE(AST_INT,
             STB_LANG_IR_RETURN_SELF(IR_INT);
         )
         STB_LANG_IR_CASE(AST_FUNCALL,
-            STB_LANG_IR_FUNCALL(IR_VAR, IR_CALL, IR_ASSIGN_REG, IR_REG);
+            STB_LANG_IR_ARGS(IR_ASSIGN_REG, IR_REG);
+            STB_LANG_IR_EMIT(IR_CALL, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
         )
         STB_LANG_IR_CASE(AST_ADD,
-            STB_LANG_IR_BINARY(IR_ADD, IR_REG);
+            STB_LANG_IR_NEW_TEMP();
+            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND_NAME(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_TEMP(IR_REG)
         )
         STB_LANG_IR_CASE(AST_SUB,
-            STB_LANG_IR_BINARY(IR_SUB, IR_REG);
+            STB_LANG_IR_NEW_TEMP();
+            STB_LANG_IR_EMIT(IR_SUB, STB_LANG_IR_OPERAND_NAME(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_TEMP(IR_REG)
         )
         STB_LANG_IR_CASE(AST_MUL,
-            STB_LANG_IR_BINARY(IR_MUL, IR_REG);
+            STB_LANG_IR_NEW_TEMP();
+            STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND_NAME(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_TEMP(IR_REG)
         )
         STB_LANG_IR_CASE(AST_DIV,
-            STB_LANG_IR_BINARY(IR_DIV, IR_REG);
+            STB_LANG_IR_NEW_TEMP();
+            STB_LANG_IR_EMIT(IR_DIV, STB_LANG_IR_OPERAND_NAME(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_TEMP(IR_REG)
         )
     )
 );
@@ -259,38 +286,44 @@ STB_LANG_NEW_REGALLOC(
         STB_LANG_REGALLOC_CASE(IR_FUNCDEF_END,
         )
         STB_LANG_REGALLOC_CASE(IR_ASSIGN,
-            STB_LANG_REGALLOC_ASSIGN(IR_REG, IR_VAR)
+            STB_LANG_REGALLOC_ARG(dest){
+                STB_LANG_SAVE_REG(phys1);
+            };
         )
         STB_LANG_REGALLOC_CASE(IR_DECL,
-            STB_LANG_REGALLOC_DECLARE(IR_REG, IR_VAR)
+            STB_LANG_REGALLOC_ARG(dest){
+                STB_LANG_SAVE_REG(phys1);
+            };
         )
         STB_LANG_REGALLOC_CASE(IR_ASSIGN_REG,
-            STB_LANG_REGALLOC_ASSIGN_REG(IR_REG)
         )
 
         STB_LANG_REGALLOC_CASE(IR_PUSH,
-            STB_LANG_REGALLOC_PUSH(IR_REG)
+            STB_LANG_SAVE_REG(phys1);
         )
         STB_LANG_REGALLOC_CASE(IR_POP,
         )
 
-        STB_LANG_REGALLOC_CASE(IR_ADD,
-            STB_LANG_REGALLOC_BINARY(IR_REG)
+        STB_LANG_REGALLOC_2CASES(IR_ADD, IR_SUB,
+            STB_CONCAT(CUR_REGALLOC_NAME, _Reg) right;
+            STB_LANG_SAVE_REG(phys1, {
+                if (instr->right->type != IR_INT){
+                    STB_LANG_SAVE_REG(phys2);
+                }else {
+                    STB_LANG_REGALLOC_NEGATE(phys2);
+                };
+            });
         )
-        STB_LANG_REGALLOC_CASE(IR_SUB,
-            STB_LANG_REGALLOC_BINARY(IR_REG)
-        )
-        STB_LANG_REGALLOC_CASE(IR_MUL,
-            STB_LANG_REGALLOC_BINARY(IR_REG)
-        )
-        STB_LANG_REGALLOC_CASE(IR_DIV,
-            STB_LANG_REGALLOC_BINARY(IR_REG)
+        STB_LANG_REGALLOC_2CASES(IR_MUL, IR_DIV,
+            STB_LANG_SAVE_REG(phys1, {
+                STB_LANG_SAVE_REG(phys2);
+            });
         )
 
         STB_LANG_REGALLOC_CASE(IR_CALL,
         )
     ),
-    STB_LANG_REGALLOC_OPERAND(IR_REG)
+    IR_REG
 )
 
 #define CUR_CODEGEN_NAME Lang_CodeGen
