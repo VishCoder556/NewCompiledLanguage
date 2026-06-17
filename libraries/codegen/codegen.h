@@ -6,6 +6,7 @@
 
 #define STB_LANG_CODEGEN_LIST(...) __VA_ARGS__
 #define STB_LANG_CODEGEN_CASE(typ, ...) else if( instr->type == typ ) {__VA_ARGS__;}
+#define STB_LANG_CODEGEN_2CASES(typ, typ2, ...) else if( instr->type == typ || instr->type == typ2 ) {__VA_ARGS__;}
 
 #define STB_LANG_EMIT_CODE(...) STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(gen, instr->offset, __VA_ARGS__);
 
@@ -115,123 +116,10 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
 
 
 
-#define STB_LANG_ARM_PROLOGUE() \
-STB_LANG_EMIT_CODE("%s:\n", instr->dest->value); \
-STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n"); \
-STB_LANG_EMIT_CODE("\tmov x29, sp\n"); \
-STB_LANG_EMIT_CODE("\tsub sp, sp, #32\n"); \
-STB_LANG_GO_TO_FUNC(instr->dest->value);
 
-
-#define STB_LANG_X86_64_PROLOGUE() \
-STB_LANG_EMIT_CODE("%s:\n", instr->dest->value); \
-STB_LANG_EMIT_CODE("\tpush rbp\n"); \
-STB_LANG_EMIT_CODE("\tmov rbp, rsp\n"); \
-STB_LANG_EMIT_CODE("\tsub rsp, 32\n"); \
-STB_LANG_GO_TO_FUNC(instr->dest->value); \
-
-
-#define STB_LANG_ARM_EPILOGUE() \
-STB_LANG_EMIT_CODE("\tmov sp, x29\n"); \
-STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n"); \
-STB_LANG_EMIT_CODE("\tret\n");
-
-#define STB_LANG_X86_64_EPILOGUE() \
-STB_LANG_EMIT_CODE("\tmov rsp, rbp\n"); \
-STB_LANG_EMIT_CODE("\tpop rbp\n"); \
-STB_LANG_EMIT_CODE("\tret\n");
-
-#define STB_LANG_CODEGEN_ASSIGN()\
-int size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->dest->value); \
-int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value);
-
-#define STB_LANG_ARM_ASSIGN(reg, lit, var) \
-if (instr->dest->type == var){ \
-    STB_LANG_CODEGEN_ASSIGN();  \
-    ; \
-    if (instr->left->type == var){ \
-        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value); \
-        STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys1, size), newoffset); \
-    }else if(instr->left->type == lit){ \
-        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", STB_LANG_REGISTER(instr->phys1, size), instr->left->value); \
-    }else if(instr->left->type == reg){ \
-        STB_LANG_EMIT_CODE("\tmov %s, %s\n", STB_LANG_REGISTER(instr->phys1, size), STB_LANG_REGISTER(instr->left->phys, size)); \
-    } \
-    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys1, size), offset); \
-    ; \
-}else if (instr->dest->type == reg){ \
-    if (instr->left->type == var){ \
-        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value); \
-        STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", instr->dest->value, newoffset); \
-    }else if(instr->left->type == lit){ \
-        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", instr->dest->value, instr->left->value); \
-    } \
-}
-
-#define STB_LANG_ARM_ASSIGN_REG(reg, lit, var) \
-if (instr->dest->type == reg && instr->dest->value[0] == 'a'){ \
-    int r = atoi(instr->dest->value+1); \
-    if (instr->left != NULL){ \
-        if (instr->left->type == lit) { \
-            STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->left->value); \
-        }else if (instr->left->type == var){ \
-            int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value); \
-            STB_LANG_EMIT_CODE("\tldr x%d, [sp, #%d]\n", r, newoffset); \
-        }else if (instr->left->type == reg) { \
-            STB_LANG_EMIT_CODE("\tmov x%d, %s\n", r, STB_LANG_REGISTER(instr->left->phys, 8)); \
-        } \
-    } \
-} \
-
-
-#define STB_LANG_ARM_FUNCALL() \
-STB_LANG_EMIT_CODE("\tbl %s\n", instr->dest->value);
-
-#define STB_LANG_ARM_MOVE(reg, lit, var, right, ...) {\
-char *leftr = __VA_ARGS__; \
-if (leftr[0] == 't'){ \
-    leftr = STB_LANG_REGISTER(instr->dest->phys, 8); \
-} \
-if (right->type == lit) { \
-    STB_LANG_EMIT_CODE("\tmov %s, #%s\n", leftr, right->value); \
-}else if(right->type == var){ \
-    int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, right->value); \
-    STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, newoffset); \
-}else if (right->type == reg){ \
-    STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_REGISTER(right->phys, 8)); \
-} \
-}
-
-#define STB_LANG_ARM_PUSH(lit, var, reg) \
-    STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(instr->phys1, 8)); \
-    STB_LANG_EMIT_CODE("\tstr %s, [sp, #-16]!\n", STB_LANG_REGISTER(instr->phys1, 8)); \
 
 
 // FIXED: Pop reads your target register from the stack memory space and clears 16 alignment bytes
-#define STB_LANG_ARM_POP() \
-    STB_LANG_EMIT_CODE("\tldr %s, [sp], #16\n", instr->dest->value);
-
-
-#define STB_LANG_ARM_DECLARE(...) STB_LANG_ARM_ASSIGN(__VA_ARGS__)
-// ^ Yes, they are the same thing for now, but later on I will add a second symbol table with offsets and then they'll be different
-
-
-#define STB_LANG_ARM_PREFIX \
-STB_LANG_EMIT_CODE("%s\n", ".global _main"); \
-STB_LANG_EMIT_CODE("%s\n", ".align 2");
-
-
-#define STB_LANG_ARM_BINARY(op, reg, lit, var) \
-if (instr->dest->type == reg) { \
-\
-    STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(instr->phys1, 8)); \
-if (instr->phys2 != -1){ \
-    STB_LANG_ARM_MOVE(reg, lit, var, instr->right, STB_LANG_REGISTER(instr->phys2, 8)); \
-    STB_LANG_EMIT_CODE("\t%s %s, %s, %s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys1, 8), STB_LANG_REGISTER(instr->phys2, 8)); \
-}else { \
-    STB_LANG_EMIT_CODE("\t%s %s, %s, #%s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys1, 8), instr->right->value); \
-} \
-}
 
 
 

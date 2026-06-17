@@ -11,7 +11,7 @@
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 5)
 
 #define STB_LANG_IR_EMIT(typ, des, lef, righ) \
-STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .left=lef, .right=righ, .dest=des, .offset=offset, .phys1=-1, .phys2=-1})
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .left=lef, .right=righ, .dest=des, .offset=offset, .phys={-1}})
 
 
 #define STB_LANG_IR_BLOCK() do {\
@@ -42,7 +42,7 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *_args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)a
 int idx = 0; \
 while (_args != NULL){ \
     STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, _args); \
-    char str[10];snprintf(str, 10, "a%d", idx); \
+    char str[32];snprintf(str, 32, "a%d", idx);; \
     STB_LANG_IR_EMIT(opcode, STB_LANG_IR_OPERAND_NAME(reg, strdup(str)), operand, NULL); \
     idx++; \
     _args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_args->next; \
@@ -59,8 +59,10 @@ while (_args != NULL){ \
 
 #define STB_LANG_IR_RETURN_SELF(type) return STB_LANG_IR_OPERAND_NAME(type, ast->value);
 
-#define STB_LANG_IR_NEW_TEMP() char *temp_reg = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
-#define STB_LANG_IR_TEMP(reg) STB_LANG_IR_OPERAND_NAME(reg, temp_reg)
+#define STB_LANG_IR_NEW_TEMP(temp_reg) char *temp_reg = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
+#define STB_LANG_IR_AS_TEMP(reg, temp_reg) STB_LANG_IR_OPERAND_NAME(reg, temp_reg)
+#define STB_LANG_IR_NEW_LABEL(label) char *label = STB_CONCAT(CUR_IR_PREFIX, _make_temp_label_name)(ir);
+#define STB_LANG_IR_LABEL(var, label) STB_LANG_IR_OPERAND_NAME(var, label)
 
 
 
@@ -79,9 +81,7 @@ typedef struct { \
     STB_CONCAT(CUR_IR_NAME, _Operand) *right; \
     STB_CONCAT(CUR_IR_NAME, _Operand) *dest; \
     int offset; \
-    ; \
-    int phys1; \
-    int phys2; \
+    int phys[4]; \
 }STB_CONCAT(CUR_IR_NAME, _Instr); \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_IR_NAME, _Instr));\
 typedef struct { \
@@ -91,10 +91,16 @@ typedef struct { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
     int temp_number; \
+    int label_count; \
 }CUR_IR_NAME; \
 char *STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(Lang_IR *ir) { \
     char *str = malloc(16); \
     snprintf(str, 16, "t%d", ir->temp_number++); \
+    return str; \
+} \
+char *STB_CONCAT(CUR_IR_PREFIX, _make_temp_label_name)(Lang_IR *ir) { \
+    char *str = malloc(20); \
+    snprintf(str, 20, "%d", ir->label_count++); \
     return str; \
 } \
 CUR_IR_NAME *STB_CONCAT(CUR_IR_PREFIX, _init)(CUR_TYPEINFO_NAME *checker){ \

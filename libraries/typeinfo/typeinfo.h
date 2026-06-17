@@ -191,13 +191,6 @@ while (_block != NULL){ \
 #define STB_LANG_EXPECT_TYPE_EQ(left, right) if (left != NULL && right != NULL){if (left->typeinfo != right->typeinfo){ \
 stb_lang_error_minor(checker->file.name, checker->file.contents, left->offset, "TypeinfoError", "Expected types to be equal"); \
 }}
-// ^ Yes, the error messages look bad as of right now; I will fix them eventually.
 
-
-
-
-#define STB_LANG_TYPEINFO_FUNCALL() \
-
-#define STB_LANG_TYPEINFO_BINARY(op) \
 
 #endif

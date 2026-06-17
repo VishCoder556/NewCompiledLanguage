@@ -70,7 +70,7 @@ void stb_lang_error_minor(char *file, char *contents, int offset, char *type, ch
         if (contents[i] == '\n') {row++;col=i;last=i;};
         if (contents[i] == '\0') {break;};
     };
-    char *line = strdup(contents + col + 1);
+    char *line = strdup(contents + col);
 
     i=last + 1;
     while(1){
@@ -78,9 +78,9 @@ void stb_lang_error_minor(char *file, char *contents, int offset, char *type, ch
         if (contents[i] == '\0') {break;};
         i++;
     };
-    line[i-(last + 1)] = '\0';
+    line[i-(last)] = '\0';
 
-    col = (offset - col) - 1;
+    col = (offset - col);
 
 
     int newrow = row;

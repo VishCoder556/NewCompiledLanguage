@@ -46,7 +46,7 @@ break; \
 
 #define STB_LANG_IF_TOKEN(typ, ...) if (token.type == typ) {match_token = token; __VA_ARGS__;}
 #define STB_LANG_ELSE_IF_TOKEN(...) else STB_LANG_IF_TOKEN(__VA_ARGS__)
-#define STB_LANG_IF_VALUE(typ, val, ...) if (token.type == typ) {if (strcmp(token.value, val) == 0){match_token = token;STB_LANG_PARSER_ADVANCE();__VA_ARGS__;};}
+#define STB_LANG_IF_VALUE(typ, val, ...) if (token.type == typ) {if (strcmp(token.value, val) == 0){match_token = token;__VA_ARGS__;};}
 
 #define STB_LANG_ELSE(...) else{__VA_ARGS__;}
 
@@ -238,16 +238,14 @@ typedef enum { \
     _n; \
 })
 
-#define STB_LANG_AST_FUNCDEF(typ, name, params, block) \
+#define STB_LANG_AS_AST(...) (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)__VA_ARGS__
+#define STB_LANG_LINKED_LIST(what) STB_LANG_AS_AST(GetLinkedListHead(what, STB_CONCAT(CUR_PARSER_NAME, _AST)))
+
+
+#define STB_LANG_AST(...) \
 ({ \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
-    _n->typeinfo = -1; \
-    _n->type = typ; \
-    _n->value = name.value; \
-    _n->left = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(params, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
-    _n->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)GetLinkedListHead(block, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
-    _n->next = NULL; \
-    _n->offset = offset; \
+    *_n = (STB_CONCAT(CUR_PARSER_NAME, _AST)){__VA_ARGS__}; \
     _n; \
 })
 
@@ -265,7 +263,8 @@ typedef enum { \
 })
 
 #define STB_LANG_OPERAND(var, val) \
-    typeof(val) var = val;
+    typeof(val) var = val; \
+    STB_LANG_PARSER_UPDATE();
 
 #define STB_LANG_PARSE_CUSTOM_LIST(starttok, splitA, endtok, ...) \
 STB_LANG_EXPECT_TOKEN(starttok) \

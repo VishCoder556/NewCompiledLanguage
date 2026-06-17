@@ -79,6 +79,15 @@ if (c == ch){ \
     val[vallen++] = '\0';\
     STB_LANG_ADD_TOKEN(.type = typ, .value=val); break; \
 }
+#define STB_LANG_TOKEN_DOUBLE_CHAR(s, stok, chtok) \
+if (c == s[0]){ \
+    STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer); \
+    if (c == s[1]){ \
+        STB_LANG_ADD_TOKEN(.type = stok, .value=NULL); break; \
+    }else { \
+        STB_LANG_ADD_TOKEN(.type = chtok, .value=NULL); return 0; \
+    }; \
+}
 
 
 #define STB_LANG_SKIP(ch) case ch: break;
