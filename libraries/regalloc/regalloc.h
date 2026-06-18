@@ -7,6 +7,9 @@
 #define STB_LANG_REGALLOC_LIST(...) __VA_ARGS__
 #define STB_LANG_REGALLOC_CASE(typ, ...) else if( instr->type == typ ) {__VA_ARGS__;}
 #define STB_LANG_REGALLOC_2CASES(typ, typ2, ...) else if( instr->type == typ || instr->type == typ2 ) {__VA_ARGS__;}
+#define STB_LANG_REGALLOC_3CASES(typ, typ2, typ3, ...) else if( instr->type == typ || instr->type == typ2 || instr->type == typ3) {__VA_ARGS__;}
+#define STB_LANG_REGALLOC_4CASES(typ, typ2, typ3, typ4, ...) else if( instr->type == typ || instr->type == typ2 || instr->type == typ3 || instr->type == typ4) {__VA_ARGS__;}
+#define STB_LANG_REGALLOC_5CASES(typ, typ2, typ3, typ4, typ5, ...) else if( instr->type == typ || instr->type == typ2 || instr->type == typ3 || instr->type == typ4 || instr->type == typ5) {__VA_ARGS__;}
 
 #define STB_LANG_REGALLOC_OPERAND_INNER(reg, a) \
 if (instr->a != NULL){ \

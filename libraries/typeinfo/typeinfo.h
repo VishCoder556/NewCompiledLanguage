@@ -12,7 +12,11 @@
 #define STB_CONCAT3(a, b, c) STB_CONCAT3_EVAL(a, b, c)
 
 
-#define STB_LANG_TYPEINFO_CASE(typ) else if(ast->type == typ)
+#define STB_LANG_TYPEINFO_CASE(typ, ...) else if(ast->type == typ){__VA_ARGS__;}
+#define STB_LANG_TYPEINFO_2CASES(typ, typ2, ...) else if(ast->type == typ || ast->type == typ2){__VA_ARGS__;}
+#define STB_LANG_TYPEINFO_3CASES(typ, typ2, typ3, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3){__VA_ARGS__;}
+#define STB_LANG_TYPEINFO_4CASES(typ, typ2, typ3, typ4, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3 || ast->type == typ4) {__VA_ARGS__;}
+#define STB_LANG_TYPEINFO_5CASES(typ, typ2, typ3, typ4, typ5, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3 || ast->type == typ4 || ast->type == typ5){__VA_ARGS__;}
 
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 3)

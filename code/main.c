@@ -93,6 +93,11 @@ STB_LANG_TYPEINFO_SIZE(
 
 STB_LANG_NEW_PARSER(
 STB_LANG_BINDING_POWER(
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_LT, 5)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_LTE, 5)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_GT, 5)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_GTE, 5)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_DEQ, 5)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_ADD, 10)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_SUB, 10)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_MUL, 20)
@@ -109,7 +114,12 @@ STB_LANG_ASTS(
     AST_SUB,
     AST_MUL,
     AST_DIV,
-    AST_IF
+    AST_IF,
+    AST_LT,
+    AST_LTE,
+    AST_GT,
+    AST_GTE,
+    AST_EQ
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_MATCH_TOKEN(TOKEN_ID, 
@@ -170,60 +180,55 @@ STB_LANG_PARSE_EXPR(
         STB_LANG_TOKEN_MATCH_AST(TOKEN_SUB, AST_SUB)
         STB_LANG_TOKEN_MATCH_AST(TOKEN_MUL, AST_MUL)
         STB_LANG_TOKEN_MATCH_AST(TOKEN_DIV, AST_DIV)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_LT, AST_LT)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_LTE, AST_LTE)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_GT, AST_GT)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_GTE, AST_GTE)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_DEQ, AST_EQ)
     )
 )
 )
 
 STB_LANG_NEW_TYPEINFO(
-    STB_LANG_TYPEINFO_CASE(AST_FUNCDEF){
+    STB_LANG_TYPEINFO_CASE(AST_FUNCDEF, 
         STB_LANG_MAKE_SCOPE(ast->value);
         STB_LANG_EXPAND_PARAMS();
         STB_LANG_EXPAND_BLOCK();
-    }
-    STB_LANG_TYPEINFO_CASE(AST_ASSIGN){
+    )
+    STB_LANG_TYPEINFO_CASE(AST_ASSIGN, 
         STB_LANG_EXPAND_RHS();
         STB_LANG_INFER_TYPE(ast->value);
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
         STB_LANG_SYMBOL(ast);
-    }
-    STB_LANG_TYPEINFO_CASE(AST_DECL){
+    )
+    STB_LANG_TYPEINFO_CASE(AST_DECL,
         STB_LANG_EXPAND_RHS();
         STB_LANG_INFER_TYPE(ast->value);
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
         STB_LANG_SYMBOL(ast);
-    }
-    STB_LANG_TYPEINFO_CASE(AST_VAR){
-    }
-    STB_LANG_TYPEINFO_CASE(AST_INT){
+    )
+    STB_LANG_TYPEINFO_CASE(AST_VAR,
+    )
+    STB_LANG_TYPEINFO_CASE(AST_INT,
         STB_LANG_TYPEINFO_ASSUME_TYPE(AST_TYPE_INT);
-    }
-    STB_LANG_TYPEINFO_CASE(AST_ADD){
+    )
+    STB_LANG_TYPEINFO_5CASES(AST_LT, AST_LTE, AST_GT, AST_GTE, AST_EQ,
         STB_LANG_EXPAND_RHS();
         STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    }
-    STB_LANG_TYPEINFO_CASE(AST_SUB){
+    )
+    STB_LANG_TYPEINFO_4CASES(AST_ADD, AST_SUB, AST_MUL, AST_DIV,
         STB_LANG_EXPAND_RHS();
         STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    }
-    STB_LANG_TYPEINFO_CASE(AST_MUL){
-        STB_LANG_EXPAND_RHS();
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
-        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    }
-    STB_LANG_TYPEINFO_CASE(AST_DIV){
-        STB_LANG_EXPAND_RHS();
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
-        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    }
-    STB_LANG_TYPEINFO_CASE(AST_FUNCALL){
+    )
+    STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
         STB_LANG_EXPAND_ARGS();
-    }
-    STB_LANG_TYPEINFO_CASE(AST_IF){
+    )
+    STB_LANG_TYPEINFO_CASE(AST_IF,
         STB_LANG_EXPAND_ARGS();
         STB_LANG_EXPAND_BLOCK();
-    }
+    )
 )
 
 #define CUR_IR_NAME Lang_IR
@@ -248,6 +253,11 @@ STB_LANG_NEW_IR(
         IR_SUB,
         IR_MUL,
         IR_DIV,
+        IR_LT,
+        IR_LTE,
+        IR_GT,
+        IR_GTE,
+        IR_EQ,
         IR_JUMP_IF_FALSE,
         IR_LABEL
     ),
@@ -294,6 +304,31 @@ STB_LANG_NEW_IR(
             STB_LANG_IR_EMIT(IR_DIV, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
+        STB_LANG_IR_CASE(AST_LT,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_LT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_LTE,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_LTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_GT,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_GT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_GTE,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_GTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_EQ,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_EQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
         STB_LANG_IR_CASE(AST_IF,
             STB_LANG_IR_NEW_LABEL(label)
 
@@ -301,9 +336,9 @@ STB_LANG_NEW_IR(
             char *temp = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
             STB_LANG_IR_EMIT(IR_ASSIGN_REG, STB_LANG_IR_OPERAND_NAME(IR_REG, temp), operand, NULL);
 
-            STB_LANG_IR_EMIT(IR_JUMP_IF_FALSE, STB_LANG_IR_LABEL(IR_VAR, label), STB_LANG_IR_LHS(), STB_LANG_IR_OPERAND_NAME(IR_REG, temp));
+            STB_LANG_IR_EMIT(IR_JUMP_IF_FALSE, STB_LANG_IR_LABEL(IR_VAR, label), operand, STB_LANG_IR_OPERAND_NAME(IR_REG, temp));
             STB_LANG_IR_BLOCK()
-            STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label), STB_LANG_IR_LHS(), NULL);
+            STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label), operand, NULL);
         )
     )
 );
@@ -357,6 +392,16 @@ STB_LANG_NEW_REGALLOC(
                 STB_LANG_SAVE_REG(phys[1]);
             });
         )
+        STB_LANG_REGALLOC_5CASES(IR_LT, IR_LTE, IR_GT, IR_GTE, IR_EQ,
+            STB_CONCAT(CUR_REGALLOC_NAME, _Reg) right;
+            STB_LANG_SAVE_REG(phys[0], {
+                if (instr->right->type != IR_INT){
+                    STB_LANG_SAVE_REG(phys[1]);
+                }else {
+                    STB_LANG_REGALLOC_NEGATE(phys[1]);
+                };
+            });
+        )
 
         STB_LANG_REGALLOC_CASE(IR_CALL,
         )
@@ -372,6 +417,17 @@ if (instr->phys[1] != -1){ \
 }else { \
     STB_LANG_EMIT_CODE("\t%s %s, %s, #%s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys[0], 8), instr->right->value); \
 }
+
+#define STB_LANG_ARM_COMPARISON(op, reg, lit, var) \
+STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(instr->phys[0], 8)); \
+if (instr->phys[1] != -1){ \
+    STB_LANG_ARM_MOVE(reg, lit, var, instr->right, STB_LANG_REGISTER(instr->phys[1], 8)); \
+    STB_LANG_EMIT_CODE("\tcmp %s, %s\n", STB_LANG_REGISTER(instr->phys[0], 8), STB_LANG_REGISTER(instr->phys[1], 8)); \
+}else { \
+    STB_LANG_EMIT_CODE("\tcmp %s, #%s\n", STB_LANG_REGISTER(instr->phys[0], 8), instr->right->value); \
+} \
+STB_LANG_EMIT_CODE("\tcset %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), op);
+
 
 #define STB_LANG_ARM_MOVE(reg, lit, var, right, ...) {\
 char *leftr = __VA_ARGS__; \
@@ -474,7 +530,6 @@ STB_LANG_NEW_CODEGEN(
         )
         STB_LANG_CODEGEN_CASE(IR_ADD,
             STB_LANG_ARM_BINARY("add", IR_REG, IR_INT, IR_VAR)
-
         )
         STB_LANG_CODEGEN_CASE(IR_SUB,
             STB_LANG_ARM_BINARY("sub", IR_REG, IR_INT, IR_VAR)
@@ -484,6 +539,21 @@ STB_LANG_NEW_CODEGEN(
         )
         STB_LANG_CODEGEN_CASE(IR_DIV,
             STB_LANG_ARM_BINARY("sdiv", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_LT,
+            STB_LANG_ARM_COMPARISON("l", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_LTE,
+            STB_LANG_ARM_COMPARISON("le", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_GT,
+            STB_LANG_ARM_COMPARISON("gt", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_GTE,
+            STB_LANG_ARM_COMPARISON("ge", IR_REG, IR_INT, IR_VAR)
+        )
+        STB_LANG_CODEGEN_CASE(IR_EQ,
+            STB_LANG_ARM_COMPARISON("eq", IR_REG, IR_INT, IR_VAR)
         )
     )
 );
