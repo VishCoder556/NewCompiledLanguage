@@ -263,8 +263,8 @@ __VA_ARGS__; \
 STB_LANG_FREE_REGISTER(name);
 
 
-#define STB_LANG_REGALLOC_ARG(place) \
-if (instr->place->value[0] == 'a'){ \
+#define STB_LANG_REGALLOC_ARG(place, arg) \
+if (instr->place->type == arg){ \
     snprintf(instr->dest->value, 10, "x%d", atoi(instr->place->value + 1)); \
 }else 
 

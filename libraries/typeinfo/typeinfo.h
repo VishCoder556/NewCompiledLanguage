@@ -140,7 +140,7 @@ CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parse
 int a = 0; \
 void STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(CUR_TYPEINFO_NAME *checker, STB_CONCAT(CUR_PARSER_NAME, _AST) *ast) { \
     if (ast == NULL){ \
-        stb_lang_error_major_global("ParserError", "Found unidentified AST"); \
+        stb_lang_error_major_global("ParserError", "Found NULL AST"); \
     } \
     if (0){} __VA_ARGS__ else { \
         stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "TypecheckerError", "Could not typecheck ast with type '%d'", ast->type); \
