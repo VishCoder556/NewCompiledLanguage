@@ -26,12 +26,12 @@ while (_block != NULL){ \
 #define STB_LANG_IR_LHS() STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, STB_LANG_LHS(ast))
 
 
-#define STB_LANG_IR_PARAMS(assign, reg) do {\
+#define STB_LANG_IR_PARAMS(assign, reg, var) do {\
 STB_CONCAT(CUR_PARSER_NAME, _AST) *_args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
 int idx = 0; \
 while (_args != NULL){ \
-    char str[10];snprintf(str, 10, "a%d", idx); \
-    STB_LANG_IR_EMIT(assign, STB_LANG_IR_OPERAND_NAME(reg, strdup(str)), STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, _args), NULL); \
+    char str[10];snprintf(str, 10, "a%d", idx++); \
+    STB_LANG_IR_EMIT(assign, STB_LANG_IR_OPERAND_NAME(var, _args->value), STB_LANG_IR_OPERAND_NAME(reg, strdup(str)), NULL); \
     _args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_args->next; \
 }}while(0);
 // ^ popping from function args stack

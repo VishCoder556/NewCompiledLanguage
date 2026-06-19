@@ -1,11 +1,20 @@
-int foo(){
-    int i = 0;
-    while (i < 10){
-        printf("Hi, %d\n", i)
-        i = i + 1
+int fibonacci(int n) {
+    if (n < 2) {
+        return n
     }
-    return i;
+    int a = 0;
+    int b = 1;
+    int i = 2;
+    int temp = 0;
+    
+    while (i <= n) {
+        temp = a + b;
+        a = b;
+        b = temp;
+        i = i + 1;
+    }
+    return b;
 }
 int main(int argc, int argv){
-    return foo();
+    exit(fibonacci(10));
 }
