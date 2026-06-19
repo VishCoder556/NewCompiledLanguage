@@ -60,6 +60,7 @@ typedef struct { \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
     STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register_BackTrack) backtrack; \
     int cursor; \
+    STB_CONCAT3(dymarray_, CUR_IR_NAME, _Symbol) symbols; \
 }CUR_REGALLOC_NAME; \
 STB_CONCAT(CUR_REGALLOC_NAME, _Reg) STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(CUR_REGALLOC_NAME *regalloc, int offset){ \
     STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register) *dym = regalloc->regs; \
@@ -142,6 +143,7 @@ CUR_REGALLOC_NAME *STB_CONCAT(CUR_REGALLOC_PREFIX, _init)(CUR_IR_NAME *ir){ \
     regalloc->regs = STB_CONCAT(CUR_REGALLOC_PREFIX, _regs_init)(); \
     regalloc->backtrack = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register_BackTrack), _new)(); \
     regalloc->cursor = 0; \
+    regalloc->symbols = ir->symbols; \
     return regalloc; \
 } \
 char STB_CONCAT(CUR_REGALLOC_PREFIX, _ir)(CUR_REGALLOC_NAME *regalloc, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \

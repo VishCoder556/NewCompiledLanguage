@@ -1,10 +1,11 @@
 int foo(){
     int i = 0;
-    while (i <= 10){
+    while (i < 10){
+        printf("Hi, %d\n", i)
         i = i + 1
     }
     return i;
 }
-int _main(int argc, int argv){
-    _exit(foo())
+int main(int argc, int argv){
+    return foo();
 }

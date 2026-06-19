@@ -83,13 +83,19 @@ typedef struct { \
     int offset; \
     int phys[4]; \
 }STB_CONCAT(CUR_IR_NAME, _Instr); \
+typedef struct { \
+    char *data; \
+    int length; \
+}STB_CONCAT(CUR_IR_NAME, _Symbol); \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_IR_NAME, _Instr));\
+STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_IR_NAME, _Symbol));\
 typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *head; \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *tail; \
     STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr) instrs; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
+    STB_CONCAT3(dymarray_, CUR_IR_NAME, _Symbol) symbols; \
     int temp_number; \
     int label_count; \
 }CUR_IR_NAME; \
@@ -108,11 +114,17 @@ CUR_IR_NAME *STB_CONCAT(CUR_IR_PREFIX, _init)(CUR_TYPEINFO_NAME *checker){ \
     ir->head = checker->head; \
     ir->tail = ir->head; \
     ir->instrs = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _new)(); \
+    ir->symbols = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Symbol), _new)(); \
     ir->root_scope = checker->root_scope; \
     ir->file = checker->file; \
     ir->temp_number = 0; \
     return ir; \
 } \
+long STB_CONCAT(CUR_IR_PREFIX, _symbol_new)(CUR_IR_NAME *ir, char *data, int length){ \
+    STB_CONCAT(CUR_IR_NAME, _Symbol) symbol = (STB_CONCAT(CUR_IR_NAME, _Symbol)){.data=data, .length=length}; \
+    STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Symbol), _add)(&ir->symbols, symbol); \
+    return ir->symbols.datalen-1; \
+}; \
 STB_CONCAT(CUR_IR_NAME, _Operand) *STB_CONCAT(CUR_IR_PREFIX, _ast)(CUR_IR_NAME *ir, STB_CONCAT(CUR_PARSER_NAME, _AST) *ast){ \
     int offset = ast->offset; \
     if (0){}cases else { \

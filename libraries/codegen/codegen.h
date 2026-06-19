@@ -40,7 +40,7 @@ _curscope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(((STB_CONCAT(CUR
 gen->current_scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))_curscope;
 
 
-#define STB_LANG_NEW_CODEGEN(prefix, list) \
+#define STB_LANG_NEW_CODEGEN(prefix, suffix, list) \
 dymarray_typenew(char, 300, 40); \
 typedef struct { \
     STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr) instrs; \
@@ -52,6 +52,7 @@ typedef struct { \
     STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register) *regs; \
     STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _VirtualRegister) *virtual_regs; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
+    STB_CONCAT3(dymarray_, CUR_IR_NAME, _Symbol) symbols; \
 }CUR_CODEGEN_NAME; \
 STB_LANG_SIZE_OFFSET(); \
 void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, int offset, char *str, ...){ \
@@ -92,6 +93,7 @@ CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_REGALLOC_NAME *regal
     gen->regs = regalloc->regs; \
     gen->virtual_regs = regalloc->virtual_regs; \
     gen->file = regalloc->file; \
+    gen->symbols = regalloc->symbols; \
     STB_CONCAT(CUR_IR_NAME, _Instr) *instr = (gen->instrs.data + gen->cursor); \
  \
     prefix; \
@@ -104,25 +106,23 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_
     return 0; \
 }; \
 char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
-    if (gen->cursor >= gen->instrs.datalen){ \
-        return -1; \
-    } \
     STB_CONCAT(CUR_IR_NAME, _Instr) *instr = (gen->instrs.data + gen->cursor); \
     if (STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(gen, instr) == -1){return -1;}; \
+    if (gen->cursor >= gen->instrs.datalen - 1){ \
+        suffix;return -1; \
+    } \
     gen->cursor++; \
     return 0; \
 };
 
-
-
-
-
-
-
-// FIXED: Pop reads your target register from the stack memory space and clears 16 alignment bytes
-
-
-
 #define STB_LANG_CODEGEN_PREFIX(...) __VA_ARGS__
+#define STB_LANG_CODEGEN_SUFFIX(...) __VA_ARGS__
+
+
+#define STB_LANG_ITERATE(array, typ, ...) \
+for (int idx=0; idx<array.datalen; idx++){ \
+    typ iter = array.data[idx]; \
+    __VA_ARGS__; \
+}
 
 #endif
