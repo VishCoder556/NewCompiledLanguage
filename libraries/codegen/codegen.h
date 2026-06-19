@@ -35,8 +35,8 @@ int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, 
 }
 
 #define STB_LANG_GO_TO_FUNC(nam) \
-STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* _curscope = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope; \
-STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)((*((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->root_scope)), nam, &_curscope); \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* _curscope = NULL; \
+_curscope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->root_scope), nam); \
 gen->current_scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))_curscope;
 
 

@@ -42,7 +42,7 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *_args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)a
 int idx = 0; \
 while (_args != NULL){ \
     STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, _args); \
-    char str[32];snprintf(str, 32, "a%d", idx);; \
+    char str[32];snprintf(str, 32, "a%d", idx); \
     STB_LANG_IR_EMIT(opcode, STB_LANG_IR_OPERAND_NAME(reg, strdup(str)), operand, NULL); \
     idx++; \
     _args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_args->next; \

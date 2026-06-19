@@ -64,6 +64,7 @@ STB_LANG_NEW_TOKENIZER(
     STB_LANG_NUM(TOKEN_NUM)
     STB_LANG_STRING('"', TOKEN_STRING)
     STB_LANG_TOKEN_DOUBLE_CHAR(">=", TOKEN_GTE, TOKEN_GT)
+    STB_LANG_TOKEN_DOUBLE_CHAR("<=", TOKEN_LTE, TOKEN_LT)
     STB_LANG_TOKEN_DOUBLE_CHAR("==", TOKEN_DEQ, TOKEN_EQ)
     STB_LANG_SKIP(' ')
 )
@@ -115,11 +116,13 @@ STB_LANG_ASTS(
     AST_MUL,
     AST_DIV,
     AST_IF,
+    AST_WHILE,
     AST_LT,
     AST_LTE,
     AST_GT,
     AST_GTE,
-    AST_EQ
+    AST_EQ,
+    AST_RET
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_MATCH_TOKEN(TOKEN_ID, 
@@ -144,6 +147,19 @@ STB_LANG_PARSE_AST(
         STB_LANG_EXPECT_TOKEN(TOKEN_RP)
         STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
         return STB_LANG_AST(.type=AST_IF, .value=NULL, .left=STB_LANG_AS_AST(ifexpr), .right=STB_LANG_LINKED_LIST(stmnts));
+    )
+    STB_LANG_IF_VALUE(TOKEN_ID, "while", 
+        STB_LANG_PARSER_ADVANCE();
+        STB_LANG_EXPECT_TOKEN(TOKEN_LP)
+        STB_LANG_OPERAND(ifexpr, lang_parser_parse_expr(parser, 0));
+        STB_LANG_EXPECT_TOKEN(TOKEN_RP)
+        STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
+        return STB_LANG_AST(.type=AST_WHILE, .value=NULL, .left=STB_LANG_AS_AST(ifexpr), .right=STB_LANG_LINKED_LIST(stmnts));
+    )
+    STB_LANG_IF_VALUE(TOKEN_ID, "return", 
+        STB_LANG_PARSER_ADVANCE();
+        STB_LANG_OPERAND(expr, lang_parser_parse_expr(parser, 0));
+        return STB_LANG_AST(.type=AST_RET, .value=NULL, .left=STB_LANG_AS_AST(expr), .right=NULL);
     )
     STB_LANG_PARSE_TYPEINFO(typeinfo, token){
         STB_LANG_PARSER_ADVANCE()
@@ -170,7 +186,13 @@ STB_LANG_PARSE_AST(
 ),
 STB_LANG_PARSE_EXPR(
     STB_LANG_MATCH_TOKEN(TOKEN_ID,  
-        left = STB_LANG_AST_LITERAL(AST_VAR, match_token);
+        STB_LANG_SAVE(name, match_token)
+        STB_LANG_IF_TOKEN(TOKEN_LP,
+            STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
+            return STB_LANG_AST_FUNCALL(AST_FUNCALL, name, args)
+        ) STB_LANG_ELSE(
+            left = STB_LANG_AST_LITERAL(AST_VAR, name);
+        )
     )
     STB_LANG_MATCH_TOKEN(TOKEN_NUM,  
         left = STB_LANG_AST_LITERAL(AST_INT, match_token);
@@ -225,9 +247,12 @@ STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
         STB_LANG_EXPAND_ARGS();
     )
-    STB_LANG_TYPEINFO_CASE(AST_IF,
+    STB_LANG_TYPEINFO_2CASES(AST_IF, AST_WHILE,
         STB_LANG_EXPAND_ARGS();
         STB_LANG_EXPAND_BLOCK();
+    )
+    STB_LANG_TYPEINFO_CASE(AST_RET,
+        STB_LANG_EXPAND_ARGS();
     )
 )
 
@@ -238,8 +263,7 @@ STB_LANG_NEW_IR(
     STB_LANG_IR_OPERANDS(
         IR_INT,
         IR_VAR,
-        IR_REG,
-        IR_ARG
+        IR_REG
     ),
     STB_LANG_IR_INSTRS(
         IR_FUNCDEF_BEGIN,
@@ -260,12 +284,14 @@ STB_LANG_NEW_IR(
         IR_GTE,
         IR_EQ,
         IR_JUMP_IF_FALSE,
-        IR_LABEL
+        IR_JUMP,
+        IR_LABEL,
+        IR_RET
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
             STB_LANG_IR_EMIT(IR_FUNCDEF_BEGIN, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
-            STB_LANG_IR_PARAMS(IR_ASSIGN, IR_ARG)
+            STB_LANG_IR_PARAMS(IR_ASSIGN, IR_REG)
             STB_LANG_IR_BLOCK()
             STB_LANG_IR_EMIT(IR_FUNCDEF_END, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
         )
@@ -282,7 +308,7 @@ STB_LANG_NEW_IR(
             STB_LANG_IR_RETURN_SELF(IR_INT);
         )
         STB_LANG_IR_CASE(AST_FUNCALL,
-            STB_LANG_IR_ARGS(IR_ASSIGN_REG, IR_ARG);
+            STB_LANG_IR_ARGS(IR_ASSIGN_REG, IR_REG);
             STB_LANG_IR_EMIT(IR_CALL, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
         )
         STB_LANG_IR_CASE(AST_ADD,
@@ -341,6 +367,29 @@ STB_LANG_NEW_IR(
             STB_LANG_IR_BLOCK()
             STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label), operand, NULL);
         )
+        STB_LANG_IR_CASE(AST_RET,
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_LANG_IR_EMIT(IR_RET, NULL, operand, NULL);
+        )
+        STB_LANG_IR_CASE(AST_WHILE,
+            STB_LANG_IR_NEW_LABEL(label)
+            STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label), NULL, NULL);
+
+            STB_LANG_IR_NEW_LABEL(label1)
+
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            char *temp = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
+            STB_LANG_IR_EMIT(IR_ASSIGN_REG, STB_LANG_IR_OPERAND_NAME(IR_REG, temp), operand, NULL);
+            STB_LANG_IR_EMIT(IR_JUMP_IF_FALSE, STB_LANG_IR_LABEL(IR_VAR, label1), operand, STB_LANG_IR_OPERAND_NAME(IR_REG, temp));
+
+
+            STB_LANG_IR_BLOCK()
+
+
+            STB_LANG_IR_EMIT(IR_JUMP, STB_LANG_IR_LABEL(IR_VAR, label), operand, NULL);
+
+            STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label1), NULL, NULL);
+        )
     )
 );
 
@@ -397,6 +446,13 @@ STB_LANG_NEW_REGALLOC(
 
         STB_LANG_REGALLOC_CASE(IR_CALL,
         )
+
+        STB_LANG_REGALLOC_CASE(IR_RET,
+            STB_LANG_EXPAND_OPERAND(left, IR_REG)
+        )
+
+        STB_LANG_REGALLOC_CASE(IR_JUMP,
+        )
     ),
     IR_REG
 )
@@ -409,6 +465,7 @@ if (instr->phys[1] != -1){ \
 }else { \
     STB_LANG_EMIT_CODE("\t%s %s, %s, #%s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys[0], 8), instr->right->value); \
 }
+
 
 #define STB_LANG_ARM_COMPARISON(op, reg, lit, var) \
 STB_LANG_ARM_MOVE(reg, lit, var, instr->left, STB_LANG_REGISTER(instr->phys[0], 8)); \
@@ -457,12 +514,6 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n"); \
             STB_LANG_EMIT_CODE("\tret\n");
         )
-        STB_LANG_CODEGEN_CASE(IR_JUMP_IF_FALSE,
-            STB_LANG_EMIT_CODE("\tcbz %s, .L_label_%s\n", 
-                STB_LANG_REGISTER(instr->right->phys, 8), 
-                instr->dest->value
-            );
-        )
         STB_LANG_CODEGEN_CASE(IR_LABEL,
             STB_LANG_EMIT_CODE(".L_label_%s:\n", instr->dest->value)
         )
@@ -481,19 +532,17 @@ STB_LANG_NEW_CODEGEN(
                 STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys[0], size), offset);
                 ;
             }else if (instr->dest->type == IR_REG){
-                if (instr->left->type == IR_VAR){
-                    int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value);
-                    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", instr->dest->value, newoffset);
-                }else if(instr->left->type == IR_INT){
-                    STB_LANG_EMIT_CODE("\tmov %s, #%s\n", instr->dest->value, instr->left->value);
+                char string[32];
+                if (instr->dest->value[0] == 'a'){
+                    snprintf(string, 32, "x%d", atoi(instr->dest->value + 1));
+                }else if (instr->dest->value[0] == 't'){
+                    snprintf(string, 32, "%s", instr->dest->value);
                 }
-            }else if (instr->dest->type == IR_ARG){
-                int r = atoi(instr->dest->value+1);
                 if (instr->left->type == IR_VAR){
                     int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value);
-                    STB_LANG_EMIT_CODE("\tstr x%d, [sp, #%d]\n", r, newoffset);
+                    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", string, newoffset);
                 }else if(instr->left->type == IR_INT){
-                    STB_LANG_EMIT_CODE("\tmov x%d, #%s\n", r, instr->left->value);
+                    STB_LANG_EMIT_CODE("\tmov %s, #%s\n", string, instr->left->value);
                 }
             };
         )
@@ -504,12 +553,25 @@ STB_LANG_NEW_CODEGEN(
         STB_LANG_CODEGEN_CASE(IR_POP,
             STB_LANG_EMIT_CODE("\tldr %s, [sp], #16\n", instr->dest->value);
         )
+        STB_LANG_CODEGEN_CASE(IR_JUMP_IF_FALSE,
+            STB_LANG_EMIT_CODE("\tcbz %s, .L_label_%s\n", 
+                STB_LANG_REGISTER(instr->right->phys, 8), 
+                instr->dest->value
+            );
+        )
         STB_LANG_CODEGEN_CASE(IR_CALL,
             STB_LANG_EMIT_CODE("\tbl %s\n", instr->dest->value);
         )
+        STB_LANG_CODEGEN_CASE(IR_RET,
+            STB_LANG_ARM_MOVE(IR_REG, IR_INT, IR_VAR, instr->left, "x0")
+            STB_LANG_EMIT_CODE("\tret\n")
+        )
+        STB_LANG_CODEGEN_CASE(IR_JUMP,
+            STB_LANG_EMIT_CODE("\tb .L_label_%s\n", instr->dest->value);
+        )
         STB_LANG_CODEGEN_CASE(IR_ASSIGN_REG,
             ;char reg[15];
-            if (instr->dest->type == IR_ARG){
+            if (instr->dest->value[0] == 'a'){
                 int r = atoi(instr->dest->value+1);
                 snprintf(reg, 15, "x%d", r);
             }else if (instr->dest->type == IR_REG){
@@ -539,7 +601,7 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_ARM_BINARY("sdiv", IR_REG, IR_INT, IR_VAR)
         )
         STB_LANG_CODEGEN_CASE(IR_LT,
-            STB_LANG_ARM_COMPARISON("l", IR_REG, IR_INT, IR_VAR)
+            STB_LANG_ARM_COMPARISON("lt", IR_REG, IR_INT, IR_VAR)
         )
         STB_LANG_CODEGEN_CASE(IR_LTE,
             STB_LANG_ARM_COMPARISON("le", IR_REG, IR_INT, IR_VAR)

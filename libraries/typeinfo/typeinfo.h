@@ -42,9 +42,10 @@ STB_LANG_ADD_SYMBOL(typeinf, \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(checker->current_scope), nam); \
 if (symbol.typeinfo != -1) {ast->typeinfo = symbol.typeinfo;}
 
-#define STB_LANG_SCOPE_MAKE_CHILD(paren, ...) \
+#define STB_LANG_SCOPE_MAKE_CHILD(paren, curscope, ...) \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* news = ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)paren); \
-STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL), _add)(&news->children, __VA_ARGS__); paren = (__VA_ARGS__);
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL), _add)(&(news->children), __VA_ARGS__); \
+curscope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))news;
 
 
 #define STB_LANG_NEW_TYPEINFO(...) \
@@ -97,23 +98,21 @@ int STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_from_symbols)(STB_CONCAT3(dymar
 exit: \
     return 0; \
 } \
-int STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) scope, char *query, STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) **_new){ \
+STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) * STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope, char *query){ \
 \
     \
     if (query == NULL) {goto exit;} \
-    for (int i=0; i<scope.children.datalen; i++){\
-        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *a = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope.children.data[i]; \
-        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope1 = ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope.children.data[i]); \
+    for (int i=0; i<scope->children.datalen; i++){\
+        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *a = (STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope->children.data[i]; \
+        STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope1 = ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)scope->children.data[i]); \
         if (scope1->name != NULL){ \
             if (strcmp(scope1->name, query) == 0){ \
-                if (_new != NULL) \
-                    *_new = scope1; \
-                return 1; \
+                return scope; \
             }; \
         } \
     }; \
 exit: \
-    return 0; \
+    return NULL; \
 } \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)(STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *scope, char *query){ \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Scope) *sc = scope; \
@@ -178,7 +177,7 @@ while (_block != NULL){ \
 
 #define STB_LANG_MAKE_SCOPE(nam) do {\
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) new_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, nam); \
-    STB_LANG_SCOPE_MAKE_CHILD(checker->current_scope, new_scope); \
+    STB_LANG_SCOPE_MAKE_CHILD(checker->root_scope, checker->current_scope, new_scope); \
     checker->entry_offset = 0; \
 }while(0);
 
