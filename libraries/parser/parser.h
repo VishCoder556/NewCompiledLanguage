@@ -246,6 +246,7 @@ typedef enum { \
 ({ \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
     *_n = (STB_CONCAT(CUR_PARSER_NAME, _AST)){__VA_ARGS__}; \
+    _n->offset = offset; \
     _n; \
 })
 

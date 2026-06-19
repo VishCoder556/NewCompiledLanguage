@@ -17,6 +17,7 @@
 #define STB_LANG_TYPEINFO_3CASES(typ, typ2, typ3, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3){__VA_ARGS__;}
 #define STB_LANG_TYPEINFO_4CASES(typ, typ2, typ3, typ4, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3 || ast->type == typ4) {__VA_ARGS__;}
 #define STB_LANG_TYPEINFO_5CASES(typ, typ2, typ3, typ4, typ5, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3 || ast->type == typ4 || ast->type == typ5){__VA_ARGS__;}
+#define STB_LANG_TYPEINFO_6CASES(typ, typ2, typ3, typ4, typ5, typ6, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3 || ast->type == typ4 || ast->type == typ5 || ast->type == typ6){__VA_ARGS__;}
 
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 3)

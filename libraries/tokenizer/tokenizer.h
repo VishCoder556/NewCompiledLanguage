@@ -33,6 +33,9 @@ STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer-
     if (isalpha(c) || c == '_') { \
         int valcap = 100, vallen = 0; \
         char *val = malloc(valcap); \
+        if (val == NULL){ \
+            stb_lang_error_minor(tokenizer->file.name, tokenizer->file.contents, tokenizer->cursor, "IdentifierError", "Could not tokenize identifier"); \
+        }; \
         while (isalnum(c) || c == '_'){ \
             if (vallen >= valcap){ \
                 valcap += 32; \
@@ -49,6 +52,9 @@ STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer-
     if (isdigit(c)) { \
         int valcap = 100, vallen = 0; \
         char *val = malloc(valcap); \
+        if (val == NULL){ \
+            stb_lang_error_minor(tokenizer->file.name, tokenizer->file.contents, tokenizer->cursor, "IntegerError", "Could not tokenize number"); \
+        }; \
         while (isdigit(c)){ \
             if (vallen >= valcap - 1){ \
                 valcap += 32; \
@@ -65,6 +71,9 @@ STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token), _add)(&tokenizer-
 if (c == ch){ \
     int valcap = 100, vallen = 0; \
     char *val = malloc(valcap); \
+    if (val == NULL){ \
+        stb_lang_error_minor(tokenizer->file.name, tokenizer->file.contents, tokenizer->cursor, "StringError", "Could not tokenize string"); \
+    }; \
     if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1){break;}; \
     c = tokenizer->file.contents[tokenizer->cursor]; \
     while (c != ch){ \
