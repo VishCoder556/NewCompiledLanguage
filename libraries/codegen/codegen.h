@@ -27,7 +27,7 @@ int STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(CUR_CODEGEN_NAME *gen, 
         STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = symbol_table.data[i]; \
         if (symbol.name != NULL){ \
             if (strcmp(symbol.name, var) == 0){ \
-                return symbol.offset; \
+                return symbol.data.variable.offset; \
             }; \
         } \
     }; \

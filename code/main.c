@@ -231,6 +231,9 @@ STB_LANG_PARSE_EXPR(
 
 STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_FUNCDEF, 
+        STB_LANG_ADD_FUNCTION(ast->value, ast->typeinfo,
+            STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
+        )
         STB_LANG_MAKE_SCOPE(ast->value);
         STB_LANG_EXPAND_PARAMS();
         STB_LANG_EXPAND_BLOCK();
@@ -239,13 +242,13 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_EXPAND_RHS();
         STB_LANG_INFER_TYPE(ast->value);
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-        STB_LANG_SYMBOL(ast);
+        STB_LANG_VARIABLE(ast);
     )
     STB_LANG_TYPEINFO_CASE(AST_DECL,
         STB_LANG_EXPAND_RHS();
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
         STB_LANG_INFER_TYPE(ast->value);
-        STB_LANG_SYMBOL(ast);
+        STB_LANG_VARIABLE(ast);
     )
     STB_LANG_TYPEINFO_CASE(AST_VAR,
         STB_LANG_INFER_TYPE(ast->value);
@@ -268,6 +271,10 @@ STB_LANG_NEW_TYPEINFO(
     )
     STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
         STB_LANG_EXPAND_ARGS();
+        STB_LANG_FIND_FUNCTION(ast->value, 
+            STB_LANG_TYPEINFO_ASSUME_TYPE(function.typeinfo);
+            STB_LANG_FUNCTION_CHECK_LIST(ast->left);
+        )
     )
     STB_LANG_TYPEINFO_2CASES(AST_IF, AST_WHILE,
         STB_LANG_EXPAND_ARGS();
@@ -316,7 +323,17 @@ STB_LANG_NEW_IR(
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
             STB_LANG_IR_EMIT(IR_FUNCDEF_BEGIN, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
-            STB_LANG_IR_PARAMS(IR_ASSIGN, IR_REG, IR_VAR)
+int idx = 0;
+int argidx = 0;
+STB_LANG_ITERATE_LINKED_LIST(_args, Lang_Parser_AST,
+    if (_args->flags != STB_LANG_AST_TYPE_VARIADIC) {
+        char str[10];snprintf(str, 10, "a%d", idx++);
+        STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_VAR, _args->value), STB_LANG_IR_OPERAND_NAME(IR_REG, strdup(str)), NULL);
+    }else {
+        char str[10];snprintf(str, 10, ".arg%d", argidx++);
+        STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_VAR, _args->value), STB_LANG_IR_OPERAND_NAME(IR_VAR, _args->value), NULL);
+    }
+)
             STB_LANG_IR_BLOCK()
             STB_LANG_IR_EMIT(IR_FUNCDEF_END, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
         )
@@ -337,12 +354,25 @@ STB_LANG_NEW_IR(
             STB_LANG_IR_RETURN_SELF(IR_INT);
         )
         STB_LANG_IR_CASE(AST_FUNCALL,
-            STB_LANG_IR_ARGS(IR_ASSIGN, IR_REG);
+
+            int idx = 0;
+            int argidx = 0;
+            STB_LANG_ITERATE_LINKED_LIST(_args, Lang_Parser_AST,
+                STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, _args);
+                if (_args->flags != STB_LANG_AST_TYPE_VARIADIC) {
+                    char str[32];snprintf(str, 32, "a%d", idx++);
+                    STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_REG, strdup(str)), operand, NULL);
+                }else {
+                    char str[32];snprintf(str, 32, ".arg%d", argidx++);
+                    STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_REG, strdup(str)), operand, NULL);
+                }
+            )
+
             STB_LANG_IR_EMIT(IR_CALL, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
         )
         STB_LANG_IR_CASE(AST_ADD,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_SUB,
@@ -514,10 +544,17 @@ if (right != NULL) { \
         STB_LANG_EMIT_CODE("\tmov %s, #%s\n", leftr, right->value); \
     }else if(right->type == IR_VAR){ \
         int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, right->value); \
-        STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, newoffset); \
+        if (newoffset == 0){ \
+            STB_LANG_EMIT_CODE("\tldr %s, [sp]\n", leftr); \
+        }else { \
+            STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, newoffset); \
+        } \
     }else if (right->type == IR_REG){ \
         if (right->value[0] == 'a'){ \
             STB_LANG_EMIT_CODE("\tmov %s, x%d\n", leftr, atoi(right->value+1)); \
+        }else if (instr->dest->value[0] == '.'){ \
+            int n = atoi(instr->dest->value + 4); \
+            STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, n * 8); \
         }else { \
             STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_REGISTER(right->phys, 8)); \
         } \
@@ -559,7 +596,7 @@ STB_LANG_NEW_CODEGEN(
         STB_LANG_ITERATE(gen->symbols, Lang_IR_Symbol, 
 // This looks wrong, but there are variables idx and iter used in the iterate function
 // This is not meant to be used that seriously, so take it with a grain of salt.
-            STB_LANG_EMIT_CODE("mem_%d: .ascii \"%s\"\n", idx, iter.data);
+            STB_LANG_EMIT_CODE("mem_%d: .asciz \"%s\\0\"\n", idx, iter.data);
         )
     ),
     STB_LANG_CODEGEN_LIST(
@@ -567,7 +604,7 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_EMIT_CODE("_%s:\n", instr->dest->value); \
             STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n"); \
             STB_LANG_EMIT_CODE("\tmov x29, sp\n"); \
-            STB_LANG_EMIT_CODE("\tsub sp, sp, #32\n"); \
+            STB_LANG_EMIT_CODE("\tsub sp, sp, #64\n"); \
             STB_LANG_GO_TO_FUNC(instr->dest->value);
         )
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
@@ -587,15 +624,24 @@ STB_LANG_NEW_CODEGEN(
                 if (instr->left != NULL){
                     STB_LANG_ARM_MOVE(instr->left, STB_LANG_REGISTER(instr->phys[0], size))
                 }
-                STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys[0], size), offset);
+                if (offset == 0){
+                    STB_LANG_EMIT_CODE("\tstr %s, [sp]\n", STB_LANG_REGISTER(instr->phys[0], size));
+                }else {
+                    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys[0], size), offset);
+                }
             }else if (instr->dest->type == IR_REG){
                 char string[32];
                 if (instr->dest->value[0] == 'a'){
                     snprintf(string, 32, "x%d", atoi(instr->dest->value + 1));
+                    STB_LANG_ARM_MOVE(instr->left, string)
                 }else if (instr->dest->value[0] == 't'){
                     snprintf(string, 32, "%s", instr->dest->value);
+                    STB_LANG_ARM_MOVE(instr->left, string)
+                }else if (instr->dest->value[0] == '.'){
+                    int n = atoi(instr->dest->value + 4);
+                    STB_LANG_ARM_MOVE(instr->left, STB_LANG_REGISTER(instr->phys[0], 8))
+                    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys[0], 8), n*8);
                 }
-                STB_LANG_ARM_MOVE(instr->left, string)
             };
         )
         STB_LANG_CODEGEN_CASE(IR_PUSH,
@@ -717,12 +763,19 @@ int main(int argc, char **argv){
     // printf("%s\n", left->value);
 
 
-    Lang_TypeInfo *typeinfo = lang_typeinfo_init(parser);
-    while (lang_typeinfo_check(typeinfo) == 0){
+    Lang_TypeInfo *checker = lang_typeinfo_init(parser);
+    STB_LANG_ADD_FUNCTION("printf", AST_TYPE_VOID,
+        STB_LANG_FUNCTION_ADD_PARAM(AST_TYPE_STRING);
+        STB_LANG_FUNCTION_ADD_PARAM(STB_LANG_AST_TYPE_VARIADIC);
+    )
+    STB_LANG_ADD_FUNCTION("exit", AST_TYPE_VOID,
+        STB_LANG_FUNCTION_ADD_PARAM(AST_TYPE_INT);
+    )
+    while (lang_typeinfo_check(checker) == 0){
     }
 
 
-    Lang_IR *ir = lang_ir_init(typeinfo);
+    Lang_IR *ir = lang_ir_init(checker);
     while (lang_ir_translate(ir) == 0){
     }
 
@@ -737,6 +790,7 @@ int main(int argc, char **argv){
 
     STB_LANG_INVOKE_DRIVER(gen);
     printf("-------- ASSEMBLY CODE --------\n");
-    printf("%s\n", gen->code.data);
+    printf("%s", gen->code.data);
+    printf("-------------------------------\n\n");
     return 0;
 }

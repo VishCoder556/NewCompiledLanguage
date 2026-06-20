@@ -103,11 +103,12 @@ typedef enum { \
 typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _ASTType) type;\
     char *value; \
-    int typeinfo; \
+    char flags; \
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *left;\
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *right;\
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *next; \
     int offset; \
+    int typeinfo; \
 }STB_CONCAT(CUR_PARSER_NAME, _AST); \
 typedef struct { \
     STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _Token) tokens; \
@@ -207,6 +208,7 @@ int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(int typeinf){ \
 
 #define STB_LANG_DEFINE_TYPEINFO(...) \
 typedef enum { \
+    STB_LANG_AST_TYPE_VARIADIC = -2, \
     STB_LANG_AST_TYPE_NONE = -1, \
     __VA_ARGS__ \
 }STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo);
@@ -247,6 +249,7 @@ typedef enum { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
     *_n = (STB_CONCAT(CUR_PARSER_NAME, _AST)){__VA_ARGS__}; \
     _n->offset = offset; \
+    _n->flags = 0; \
     _n; \
 })
 

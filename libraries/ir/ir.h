@@ -26,27 +26,11 @@ while (_block != NULL){ \
 #define STB_LANG_IR_LHS() STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, STB_LANG_LHS(ast))
 
 
-#define STB_LANG_IR_PARAMS(assign, reg, var) do {\
-STB_CONCAT(CUR_PARSER_NAME, _AST) *_args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
-int idx = 0; \
-while (_args != NULL){ \
-    char str[10];snprintf(str, 10, "a%d", idx++); \
-    STB_LANG_IR_EMIT(assign, STB_LANG_IR_OPERAND_NAME(var, _args->value), STB_LANG_IR_OPERAND_NAME(reg, strdup(str)), NULL); \
-    _args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_args->next; \
-}}while(0);
+#define STB_LANG_IR_PARAMS(assign, pop, reg, var) do {\
+
 // ^ popping from function args stack
 // no function call implemented yet, we won't have to worry about pushing
 
-#define STB_LANG_IR_ARGS(opcode, reg) do {\
-STB_CONCAT(CUR_PARSER_NAME, _AST) *_args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
-int idx = 0; \
-while (_args != NULL){ \
-    STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, _args); \
-    char str[32];snprintf(str, 32, "a%d", idx); \
-    STB_LANG_IR_EMIT(opcode, STB_LANG_IR_OPERAND_NAME(reg, strdup(str)), operand, NULL); \
-    idx++; \
-    _args = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_args->next; \
-}}while(0);
 
 #define STB_LANG_IR_OPERAND_NAME(typ, val) ({ \
     STB_CONCAT(CUR_IR_NAME, _Operand) *op = malloc(sizeof(*op)); \
