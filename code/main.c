@@ -231,10 +231,10 @@ STB_LANG_PARSE_EXPR(
 
 STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_FUNCDEF, 
+        STB_LANG_MAKE_SCOPE(ast->value);
         STB_LANG_ADD_FUNCTION(ast->value, ast->typeinfo,
             STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
         )
-        STB_LANG_MAKE_SCOPE(ast->value);
         STB_LANG_EXPAND_PARAMS();
         STB_LANG_EXPAND_BLOCK();
     )
@@ -325,7 +325,7 @@ STB_LANG_NEW_IR(
             STB_LANG_IR_EMIT(IR_FUNCDEF_BEGIN, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
 int idx = 0;
 int argidx = 0;
-STB_LANG_ITERATE_LINKED_LIST(_args, Lang_Parser_AST,
+STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
     if (_args->flags != STB_LANG_AST_TYPE_VARIADIC) {
         char str[10];snprintf(str, 10, "a%d", idx++);
         STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_VAR, _args->value), STB_LANG_IR_OPERAND_NAME(IR_REG, strdup(str)), NULL);
@@ -354,21 +354,36 @@ STB_LANG_ITERATE_LINKED_LIST(_args, Lang_Parser_AST,
             STB_LANG_IR_RETURN_SELF(IR_INT);
         )
         STB_LANG_IR_CASE(AST_FUNCALL,
+            Lang_Parser_AST *params[64]; int paramslen = 0;
+            STB_LANG_ITERATE_LINKED_LIST(ast->left, arg, Lang_Parser_AST,
+                params[paramslen++] = arg;
+            )
+            int idx = -1;
+            int varidx = -1;
+            for (int i = 0; i < paramslen; i++) {
+                if (params[i]->flags != STB_LANG_AST_TYPE_VARIADIC) {
+                    idx++;
+                } else {
+                    varidx++;
+                }
+            }
 
-            int idx = 0;
-            int argidx = 0;
-            STB_LANG_ITERATE_LINKED_LIST(_args, Lang_Parser_AST,
-                STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, _args);
-                if (_args->flags != STB_LANG_AST_TYPE_VARIADIC) {
-                    char str[32];snprintf(str, 32, "a%d", idx++);
+            for (int i = paramslen - 1; i >= 0; i--) {
+                Lang_Parser_AST *param = params[i];
+
+                STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, param);
+                if (param->flags != STB_LANG_AST_TYPE_VARIADIC) {
+                    char str[32];
+                    snprintf(str, 32, "a%d", idx--); 
                     STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_REG, strdup(str)), operand, NULL);
-                }else {
-                    char str[32];snprintf(str, 32, ".arg%d", argidx++);
+                } else {
+                    char str[32];
+                    snprintf(str, 32, ".arg%d", varidx--);
                     STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND_NAME(IR_REG, strdup(str)), operand, NULL);
                 }
-            )
-
+            }
             STB_LANG_IR_EMIT(IR_CALL, STB_LANG_IR_OPERAND_NAME(IR_VAR, ast->value), NULL, NULL);
+            return STB_LANG_IR_AS_TEMP(IR_REG, "v0")
         )
         STB_LANG_IR_CASE(AST_ADD,
             STB_LANG_IR_NEW_TEMP(temp_reg);
@@ -552,9 +567,11 @@ if (right != NULL) { \
     }else if (right->type == IR_REG){ \
         if (right->value[0] == 'a'){ \
             STB_LANG_EMIT_CODE("\tmov %s, x%d\n", leftr, atoi(right->value+1)); \
-        }else if (instr->dest->value[0] == '.'){ \
+        }else if (right->value[0] == '.'){ \
             int n = atoi(instr->dest->value + 4); \
             STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, n * 8); \
+        }else if (right->value[0] == 'v'){ \
+            STB_LANG_EMIT_CODE("\tmov %s, x0\n", leftr); \
         }else { \
             STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_REGISTER(right->phys, 8)); \
         } \
@@ -601,11 +618,20 @@ STB_LANG_NEW_CODEGEN(
     ),
     STB_LANG_CODEGEN_LIST(
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_BEGIN,
-            STB_LANG_EMIT_CODE("_%s:\n", instr->dest->value); \
-            STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n"); \
-            STB_LANG_EMIT_CODE("\tmov x29, sp\n"); \
-            STB_LANG_EMIT_CODE("\tsub sp, sp, #64\n"); \
+            STB_LANG_EMIT_CODE("_%s:\n", instr->dest->value);
+            STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n");
+            STB_LANG_EMIT_CODE("\tmov x29, sp\n");
+            int offset = 16;
             STB_LANG_GO_TO_FUNC(instr->dest->value);
+            // printf("[%s]\n", STB_LANG_CURRENT_SCOPE()->name);
+            // printf("{%s}\n", STB_LANG_CURRENT_SCOPE()->name);
+            STB_LANG_ITERATE(STB_LANG_CURRENT_SCOPE()->symbols, Lang_TypeInfo_Symbol,
+                if (iter.kind == STB_LANG_SYMBOL_VARIABLE){
+                    // printf("Here, %s, %s!\n", iter.name, STB_LANG_CURRENT_SCOPE()->name);
+                    offset = iter.data.variable.offset;
+                };
+            );
+            STB_LANG_EMIT_CODE("\tsub sp, sp, #%d\n", (offset + 15) & ~15); \
         )
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
             STB_LANG_EMIT_CODE("\tmov sp, x29\n"); \

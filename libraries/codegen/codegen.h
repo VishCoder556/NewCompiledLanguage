@@ -39,6 +39,12 @@ STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* _curscope = NULL; \
 _curscope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find_scope)(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->root_scope), nam); \
 gen->current_scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))_curscope;
 
+#define STB_LANG_CURRENT_SCOPE() ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)gen->current_scope)
+
+#define STB_LANG_LAST_SYMBOL(what) what->symbols.data[what->symbols.datalen]
+
+#define STB_LANG_O
+
 
 #define STB_LANG_NEW_CODEGEN(prefix, suffix, list) \
 dymarray_typenew(char, 300, 40); \
