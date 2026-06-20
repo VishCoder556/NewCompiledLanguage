@@ -139,10 +139,10 @@ STB_CONCAT(CUR_TOKENIZER_NAME, _File) STB_CONCAT(CUR_TOKENIZER_PREFIX, _file_ini
     fl.contentlen = stb_lang_tokenizer_get_length(file); \
     fl.contents = malloc(fl.contentlen + 1); \
     fread(fl.contents, 1, fl.contentlen, file); \
-    fl.contents[fl.contentlen] = '\0'; \
     if (ferror(file)){ \
         stb_lang_error_major_global("TokenizerError", "Error when reading file"); \
     } \
+    fl.contents[fl.contentlen] = '\0'; \
     fclose(file); \
     return fl; \
 }; \

@@ -159,7 +159,15 @@ STB_LANG_PARSE_AST(
         STB_LANG_OPERAND(ifexpr, lang_parser_parse_expr(parser, 0));
         STB_LANG_EXPECT_TOKEN(TOKEN_RP)
         STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
-        return STB_LANG_AST(.type=AST_IF, .value=NULL, .left=STB_LANG_AS_AST(ifexpr), .right=STB_LANG_LINKED_LIST(stmnts));
+
+        Lang_Parser_AST *ast = STB_LANG_AST(.type=AST_IF, .value=NULL, .left=STB_LANG_AS_AST(ifexpr), .middle=NULL, .right=STB_LANG_LINKED_LIST(stmnts));
+
+        STB_LANG_IF_VALUE(TOKEN_ID, "else",
+            STB_LANG_PARSER_ADVANCE();
+            STB_LANG_PARSE_STATEMENT_LIST(else1, TOKEN_LB, -1, TOKEN_RB)
+            ast->middle = STB_LANG_LINKED_LIST(else1);
+        )
+        return ast;
     )
     STB_LANG_IF_VALUE(TOKEN_ID, "while", 
         STB_LANG_PARSER_ADVANCE();
@@ -167,12 +175,12 @@ STB_LANG_PARSE_AST(
         STB_LANG_OPERAND(ifexpr, lang_parser_parse_expr(parser, 0));
         STB_LANG_EXPECT_TOKEN(TOKEN_RP)
         STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
-        return STB_LANG_AST(.type=AST_WHILE, .value=NULL, .left=STB_LANG_AS_AST(ifexpr), .right=STB_LANG_LINKED_LIST(stmnts));
+        return STB_LANG_AST(.type=AST_WHILE, .value=NULL, .left=STB_LANG_AS_AST(ifexpr), .middle=NULL, .right=STB_LANG_LINKED_LIST(stmnts));
     )
     STB_LANG_IF_VALUE(TOKEN_ID, "return", 
         STB_LANG_PARSER_ADVANCE();
         STB_LANG_OPERAND(expr, lang_parser_parse_expr(parser, 0));
-        return STB_LANG_AST(.type=AST_RET, .value=NULL, .left=STB_LANG_AS_AST(expr), .right=NULL);
+        return STB_LANG_AST(.type=AST_RET, .value=NULL, .left=STB_LANG_AS_AST(expr), .middle=NULL, .right=NULL);
     )
     STB_LANG_PARSE_TYPEINFO(typeinfo, token){
         STB_LANG_PARSER_ADVANCE()
@@ -187,7 +195,7 @@ STB_LANG_PARSE_AST(
                 if (typeinfo == -1) {
                     type = AST_ASSIGN;
                 }
-                return STB_LANG_AST(.type=type, .typeinfo=typeinfo, .value = varia.value, .left=STB_LANG_AS_AST(assign), .right=STB_LANG_AS_AST(assign));
+                return STB_LANG_AST(.type=type, .typeinfo=typeinfo, .value = varia.value, .left=STB_LANG_AS_AST(assign), .middle=NULL, .right=STB_LANG_AS_AST(assign));
             ) STB_LANG_ELSE_IF_TOKEN(TOKEN_LP,
                 STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
                 return STB_LANG_AST_FUNCALL(AST_FUNCALL, varia, args)
@@ -276,7 +284,12 @@ STB_LANG_NEW_TYPEINFO(
             STB_LANG_FUNCTION_CHECK_LIST(ast->left);
         )
     )
-    STB_LANG_TYPEINFO_2CASES(AST_IF, AST_WHILE,
+    STB_LANG_TYPEINFO_CASE(AST_IF,
+        STB_LANG_EXPAND_ARGS();
+        STB_LANG_EXPAND_BLOCK();
+        STB_LANG_EXPAND_LIST(ast->middle);
+    )
+    STB_LANG_TYPEINFO_CASE(AST_WHILE,
         STB_LANG_EXPAND_ARGS();
         STB_LANG_EXPAND_BLOCK();
     )
@@ -442,6 +455,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         )
         STB_LANG_IR_CASE(AST_IF,
             STB_LANG_IR_NEW_LABEL(label)
+            STB_LANG_IR_NEW_LABEL(end)
 
             STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
             char *temp = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
@@ -449,7 +463,10 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
 
             STB_LANG_IR_EMIT(IR_JUMP_IF_FALSE, STB_LANG_IR_LABEL(IR_VAR, label), operand, STB_LANG_IR_OPERAND_NAME(IR_REG, temp));
             STB_LANG_IR_BLOCK()
+            STB_LANG_IR_EMIT(IR_JUMP, STB_LANG_IR_LABEL(IR_VAR, end), NULL, NULL);
             STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label), operand, NULL);
+            STB_LANG_IR_RUN(ast->middle);
+            STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, end), operand, NULL);
         )
         STB_LANG_IR_CASE(AST_RET,
             STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
@@ -771,7 +788,7 @@ int main(int argc, char **argv){
     if (input_file == NULL){
         stb_lang_error_major_global("ArgsError", "No input file provided");
     }
-    Lang_Tokenizer *tokenizer = lang_tokenizer_init("examples/a.lang");
+    Lang_Tokenizer *tokenizer = lang_tokenizer_init(input_file);
     while (lang_tokenizer_token(tokenizer) == 0){
     }
     // int len = tokenizer->tokens.datalen;
@@ -817,6 +834,6 @@ int main(int argc, char **argv){
     STB_LANG_INVOKE_DRIVER(gen);
     printf("-------- ASSEMBLY CODE --------\n");
     printf("%s", gen->code.data);
-    printf("-------------------------------\n\n");
+    printf("-------------------------------\n");
     return 0;
 }

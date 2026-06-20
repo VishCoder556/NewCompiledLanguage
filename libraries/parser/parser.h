@@ -105,6 +105,7 @@ typedef struct { \
     char *value; \
     char flags; \
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *left;\
+    struct STB_CONCAT(CUR_PARSER_NAME, _AST) *middle;\
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *right;\
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *next; \
     int offset; \
@@ -221,6 +222,7 @@ typedef enum { \
     _n->type = typ; \
     _n->value = token.value; \
     _n->left = NULL; \
+    _n->middle = NULL; \
     _n->right = NULL; \
     _n->next = NULL; \
     _n->offset = offset; \
@@ -263,6 +265,7 @@ typedef enum { \
     _n->right = NULL; \
     _n->next = NULL; \
     _n->offset = offset; \
+    _n->flags = 0; \
     _n; \
 })
 

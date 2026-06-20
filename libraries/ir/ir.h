@@ -14,12 +14,18 @@
 STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .left=lef, .right=righ, .dest=des, .offset=offset, .phys={-1}})
 
 
-#define STB_LANG_IR_BLOCK() do {\
-STB_CONCAT(CUR_PARSER_NAME, _AST) *_block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->right; \
+#define STB_LANG_IR_RUN(place) do {\
+STB_CONCAT(CUR_PARSER_NAME, _AST) *_block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)place; \
 while (_block != NULL){ \
     STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, _block); \
     _block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_block->next; \
 }}while(0);
+
+#define STB_LANG_IR_BLOCK() \
+STB_LANG_IR_RUN(ast->right);
+
+
+
 
 
 #define STB_LANG_IR_RHS() STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, STB_LANG_RHS(ast))

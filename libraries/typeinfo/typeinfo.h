@@ -64,9 +64,6 @@ while (head != NULL){ \
 
 
 
-
-
-
 #define STB_LANG_FUNCTION_ADD_PARAM(...) \
 STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo), _add)(function.data.function.args, (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo))__VA_ARGS__);
 
@@ -264,20 +261,22 @@ while (_params != NULL){ \
 }}while(0);
 
 
-#define STB_LANG_EXPAND_ARGS() do {\
-STB_CONCAT(CUR_PARSER_NAME, _AST) *_params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
-while (_params != NULL){ \
-    STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, _params); \
-    _params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_params->next; \
-}}while(0);
-
-
-#define STB_LANG_EXPAND_BLOCK() do {\
-STB_CONCAT(CUR_PARSER_NAME, _AST) *_block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->right; \
+#define STB_LANG_EXPAND_LIST(where) do {\
+STB_CONCAT(CUR_PARSER_NAME, _AST) *_block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)where; \
 while (_block != NULL){ \
     STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, _block); \
     _block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_block->next; \
 }}while(0);
+
+#define STB_LANG_EXPAND_ARGS() do {\
+STB_LANG_EXPAND_LIST(ast->left); \
+}while(0);
+
+
+#define STB_LANG_EXPAND_BLOCK() do {\
+STB_LANG_EXPAND_LIST(ast->right); \
+}while(0);
+
 
 #define STB_LANG_MAKE_SCOPE(nam) do {\
     STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) new_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, nam); \
