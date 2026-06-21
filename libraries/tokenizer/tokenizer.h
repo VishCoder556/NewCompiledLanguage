@@ -76,14 +76,26 @@ if (c == ch){ \
     }; \
     if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1){break;}; \
     c = tokenizer->file.contents[tokenizer->cursor]; \
+    bool free = 0; \
     while (c != ch){ \
         if (vallen >= valcap - 1){ \
             valcap += 32; \
             val = realloc(val, valcap); \
         } \
+        if (free == 1){free = 0;} \
+        if (c == '\\'){ \
+            free = 1;\
+        } \
         val[vallen++] = c; \
         if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1){break;}; \
         c = tokenizer->file.contents[tokenizer->cursor]; \
+        if (free == 1 && c == ch){ \
+            free = 0; \
+            val[vallen++] = c; \
+            if (STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer) == -1){break;}; \
+            c = tokenizer->file.contents[tokenizer->cursor]; \
+            continue; \
+        } \
     }; \
     val[vallen++] = '\0';\
     STB_LANG_ADD_TOKEN(.type = typ, .value=val); break; \

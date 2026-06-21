@@ -1105,6 +1105,10 @@ int main(int argc, char **argv){
         STB_LANG_FUNCTION_RETURN({.type = AST_TYPE_VOID, .ptrnum=0})
         STB_LANG_FUNCTION_ADD_PARAM({.type = AST_TYPE_INT, .ptrnum=0});
     )
+    STB_LANG_ADD_FUNCTION("malloc",
+        STB_LANG_FUNCTION_RETURN({.type = AST_TYPE_INT, .ptrnum=1})
+        STB_LANG_FUNCTION_ADD_PARAM({.type = AST_TYPE_INT, .ptrnum=0});
+    )
     while (lang_typeinfo_check(checker) == 0){
     }
 
@@ -1123,8 +1127,8 @@ int main(int argc, char **argv){
     }
 
     STB_LANG_INVOKE_DRIVER(gen);
-    printf("-------- ASSEMBLY CODE --------\n");
-    printf("%s", gen->code.data);
-    printf("-------------------------------\n");
+    // printf("-------- ASSEMBLY CODE --------\n");
+    // printf("%s", gen->code.data);
+    // printf("-------------------------------\n");
     return 0;
 }

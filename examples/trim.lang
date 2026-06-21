@@ -1,0 +1,7 @@
+int main(int argc, int argv){
+    string a = "Trim: Hello World"
+    ptr<int> str = cast(ptr<int>, a)
+    deref(str + cast(ptr<int>, 11)) = 0
+    printf("\"%s\"\n", str + cast(ptr<int>, 6))
+    return 0
+}
