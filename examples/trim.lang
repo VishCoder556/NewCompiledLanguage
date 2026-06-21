@@ -1,3 +1,7 @@
+ptr<int> malloc(int size);
+void exit(int return);
+void printf(string fmt, ...)
+
 int main(int argc, int argv){
     string a = "Trim: Hello World"
     ptr<int> str = cast(ptr<int>, a)

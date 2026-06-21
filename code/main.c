@@ -54,7 +54,8 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_BAND,
         TOKEN_OR,
         TOKEN_BOR,
-        TOKEN_CARET
+        TOKEN_CARET,
+        TOKEN_DOT
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
@@ -68,6 +69,7 @@ STB_LANG_NEW_TOKENIZER(
         STB_LANG_TOKEN_CHAR('/', TOKEN_DIV)
         STB_LANG_TOKEN_CHAR('%', TOKEN_MODULO)
         STB_LANG_TOKEN_CHAR('^', TOKEN_CARET)
+        STB_LANG_TOKEN_CHAR('.', TOKEN_DOT)
         STB_LANG_SKIP('\n')
     ),
     STB_LANG_ALPHA(TOKEN_ID)
@@ -119,6 +121,7 @@ STB_LANG_BINDING_POWER(
 ),
 STB_LANG_ASTS(
     AST_FUNCDEF,
+    AST_FUNCDECL,
     AST_VAR,
     AST_INT,
     AST_ASSIGN,
@@ -156,10 +159,40 @@ STB_LANG_PARSE_BODY(
         STB_LANG_IF_TOKEN(TOKEN_ID, // Function name
             STB_LANG_PARSER_ADVANCE();
             STB_LANG_SAVE(func_name, match_token);
-            STB_LANG_PARSE_ARGUMENT_LIST(params, TOKEN_LP, TOKEN_COMMA, TOKEN_RP, AST_VAR)
-            STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
-            Lang_Parser_AST *ast = (Lang_Parser_AST*)GetLinkedListHead(params, Lang_Parser_AST);
-            return STB_LANG_AST(.type=AST_FUNCDEF, .typeinfo=typeinfo, .value=func_name.value, .left=STB_LANG_LINKED_LIST(params), .right=STB_LANG_LINKED_LIST(stmnts));
+
+            STB_CONCAT(CUR_PARSER_NAME, _ASTList) params = (STB_CONCAT(CUR_PARSER_NAME, _ASTList)){0};
+            InitLinkedList(params, STB_CONCAT(CUR_PARSER_NAME, _AST));
+            STB_LANG_PARSE_CUSTOM_LIST(TOKEN_LP, TOKEN_COMMA, TOKEN_RP,
+                STB_LANG_GET_TYPEINFO(argt){
+                    STB_LANG_SAVE(argtype, token);
+                    STB_LANG_PARSER_ADVANCE()
+                    STB_LANG_IF_TOKEN(TOKEN_ID,
+                        STB_CONCAT(CUR_PARSER_NAME, _AST) ast = (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type=AST_VAR, .typeinfo=argt, .value=match_token.value, .offset=offset};
+                        AppendToLinkedList(params, STB_CONCAT(CUR_PARSER_NAME, _AST), ast);
+                    )
+                    STB_LANG_PARSER_ADVANCE();
+                }else {
+                    STB_LANG_IF_TOKEN(TOKEN_DOT,
+                        STB_LANG_PARSER_ADVANCE()
+                        STB_LANG_IF_TOKEN(TOKEN_DOT,
+                            STB_LANG_PARSER_ADVANCE()
+                            STB_LANG_IF_TOKEN(TOKEN_DOT,
+                                STB_LANG_PARSER_ADVANCE()
+
+                                STB_CONCAT(CUR_PARSER_NAME, _AST) ast = (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type=STB_LANG_AST_NONE, .typeinfo=STB_LANG_TYPEINFO_VARIADIC, .value=NULL, .offset=match_token.offset};
+                                AppendToLinkedList(params, STB_CONCAT(CUR_PARSER_NAME, _AST), ast);
+                            )
+                        )
+                    )
+                }
+            )
+
+            if (token.type == TOKEN_LB) {
+                STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
+                return STB_LANG_AST(.type=AST_FUNCDEF, .typeinfo=typeinfo, .value=func_name.value, .left=STB_LANG_LINKED_LIST(params), .right=STB_LANG_LINKED_LIST(stmnts));
+            }else {
+                return STB_LANG_AST(.type=AST_FUNCDECL, .typeinfo=typeinfo, .value=func_name.value, .left=STB_LANG_LINKED_LIST(params), .right=NULL);
+            }
         )
     }
 ),
@@ -339,6 +372,14 @@ STB_LANG_TYPEINFO_SIZE(
 
 
 STB_LANG_NEW_TYPEINFO(
+    STB_LANG_TYPEINFO_CASE(AST_FUNCDECL, 
+        STB_LANG_MAKE_SCOPE(ast->value);
+        STB_LANG_ADD_FUNCTION(ast->value,
+            STB_LANG_FUNCTION_RETURN(ast->typeinfo);
+            STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
+        )
+        STB_LANG_EXPAND_PARAMS();
+    )
     STB_LANG_TYPEINFO_CASE(AST_FUNCDEF, 
         STB_LANG_MAKE_SCOPE(ast->value);
         STB_LANG_ADD_FUNCTION(ast->value,
@@ -486,6 +527,9 @@ STB_LANG_NEW_IR(
         IR_STORE
     ),
     STB_LANG_IR_CASES(
+        STB_LANG_IR_CASE(AST_FUNCDECL,
+            // Skip
+        )
         STB_LANG_IR_CASE(AST_FUNCDEF,
             STB_LANG_IR_EMIT(IR_FUNCDEF_BEGIN, STB_LANG_IR_OPERAND(IR_VAR, ast->value), NULL, NULL);
 int idx = 0;
@@ -1090,25 +1134,7 @@ int main(int argc, char **argv){
     while (lang_parser_parse_body(parser) == 0){
     }
 
-    // Lang_Parser_AST *ast = GetLinkedListHead((*parser), Lang_Parser_AST);
-    // Lang_Parser_AST *left = (Lang_Parser_AST*)ast->left;
-    // printf("%s\n", left->value);
-
-
     Lang_TypeInfo *checker = lang_typeinfo_init(parser);
-    STB_LANG_ADD_FUNCTION("printf",
-        STB_LANG_FUNCTION_RETURN({.type = AST_TYPE_VOID, .ptrnum=0})
-        STB_LANG_FUNCTION_ADD_PARAM({.type = AST_TYPE_STRING, .ptrnum=0});
-        STB_LANG_FUNCTION_ADD_PARAM({.type = STB_LANG_TYPEINFO_VARIADIC, .ptrnum=0});
-    )
-    STB_LANG_ADD_FUNCTION("exit",
-        STB_LANG_FUNCTION_RETURN({.type = AST_TYPE_VOID, .ptrnum=0})
-        STB_LANG_FUNCTION_ADD_PARAM({.type = AST_TYPE_INT, .ptrnum=0});
-    )
-    STB_LANG_ADD_FUNCTION("malloc",
-        STB_LANG_FUNCTION_RETURN({.type = AST_TYPE_INT, .ptrnum=1})
-        STB_LANG_FUNCTION_ADD_PARAM({.type = AST_TYPE_INT, .ptrnum=0});
-    )
     while (lang_typeinfo_check(checker) == 0){
     }
 

@@ -336,19 +336,5 @@ STB_LANG_PARSER_EXPECT(endtok)
 
 
 // For C-like arguments
-#define STB_LANG_PARSE_ARGUMENT_LIST(into, start, split, end, var) \
-STB_CONCAT(CUR_PARSER_NAME, _ASTList) into = (STB_CONCAT(CUR_PARSER_NAME, _ASTList)){0}; \
-InitLinkedList(into, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
-STB_LANG_PARSE_CUSTOM_LIST(start, split, end, \
-    STB_LANG_GET_TYPEINFO(argt){ \
-        STB_LANG_SAVE(argtype, token); \
-        STB_LANG_PARSER_ADVANCE() \
-        STB_LANG_IF_TOKEN(TOKEN_ID, \
-            STB_CONCAT(CUR_PARSER_NAME, _AST) ast = (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type=var, .typeinfo=argt, .value=match_token.value, .offset=offset}; \
-            AppendToLinkedList(into, STB_CONCAT(CUR_PARSER_NAME, _AST), ast); \
-        )\
-        STB_LANG_PARSER_ADVANCE(); \
-    }\
-)
 
 #endif

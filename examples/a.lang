@@ -1,8 +1,13 @@
+ptr<int> malloc(int size);
+void exit(int return);
+void printf(string fmt, ...)
+
 int main(int argc, ptr<string> argv){
     int i = 0
     while (i < argc){
-        printf("Argument %d: %s\n", i, deref(argv + cast(ptr<string>, i*8)))
+        printf("Argument #%d: %s\n", i, deref(argv + cast(ptr<string>, i*8)))
         i = i + 1
     }
+    printf("Argument Count: %d\n", argc)
     return 0
 }
