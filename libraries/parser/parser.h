@@ -246,6 +246,7 @@ typedef struct { \
 })
 
 #define STB_LANG_AS_AST(...) (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)__VA_ARGS__
+#define STB_LANG_OF_AST(from, what) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)from)->what
 #define STB_LANG_LINKED_LIST(what) STB_LANG_AS_AST(GetLinkedListHead(what, STB_CONCAT(CUR_PARSER_NAME, _AST)))
 
 

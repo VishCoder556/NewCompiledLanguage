@@ -309,6 +309,9 @@ STB_LANG_EXPAND_LIST(ast->right); \
 stb_lang_error_minor(checker->file.name, checker->file.contents, offset, "TypeinfoError", "Expected types to be equal"); \
 }
 
+#define STB_LANG_TYPEINFO_ERROR_MINOR(where, type, nam) \
+stb_lang_error_minor(checker->file.name, checker->file.contents, ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)where)->offset, type, nam); \
+
 
 #define STB_LANG_EXPECT_TYPE_EQ(left, right) if (left != NULL && right != NULL){ \
     STB_LANG_EXPECT_TYPEINFO_EQ(left->typeinfo, right->typeinfo, left->offset) \

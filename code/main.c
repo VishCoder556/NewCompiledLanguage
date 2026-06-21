@@ -145,7 +145,10 @@ STB_LANG_ASTS(
     AST_BOR,
     AST_BAND,
     AST_XOR,
-    AST_EXPR
+    AST_EXPR,
+    AST_REF,
+    AST_DEREF,
+    AST_STORE
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_GET_TYPEINFO(typeinfo){
@@ -191,6 +194,20 @@ STB_LANG_PARSE_AST(
         STB_LANG_OPERAND(expr, lang_parser_parse_expr(parser, 0));
         return STB_LANG_AST(.type=AST_RET, .value=NULL, .left=STB_LANG_AS_AST(expr), .middle=NULL, .right=NULL);
     )
+    STB_LANG_IF_VALUE(TOKEN_ID, "deref", 
+        // Yes, it's hardcoded as AST_STORE, this can be fixed soon, but it's easiest to implement for now
+        STB_LANG_PARSER_ADVANCE()
+        STB_LANG_PARSER_EXPECT(TOKEN_LP);
+        STB_LANG_GET_AST_EXPR(exp, 0);
+        STB_LANG_PARSER_EXPECT(TOKEN_RP);
+        STB_LANG_IF_TOKEN(TOKEN_EQ,
+            STB_LANG_PARSER_ADVANCE();
+            STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser, 0));
+            return STB_LANG_AST(.type=AST_STORE, .typeinfo=-1, .value=NULL, .left=STB_LANG_AS_AST(exp), .middle=NULL, .right=STB_LANG_AS_AST(assign));
+        ) STB_LANG_ELSE(
+            return STB_LANG_AST(.type = AST_DEREF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+        )
+    )
     STB_LANG_GET_TYPEINFO(typeinfo){
         STB_LANG_PARSER_ADVANCE()
     maybe_assign:
@@ -204,7 +221,7 @@ STB_LANG_PARSE_AST(
                 if (typeinfo.type == -1) {
                     type = AST_ASSIGN;
                 }
-                return STB_LANG_AST(.type=type, .typeinfo=typeinfo, .value = varia.value, .left=STB_LANG_AS_AST(assign), .middle=NULL, .right=STB_LANG_AS_AST(assign));
+                return STB_LANG_AST(.type=type, .typeinfo=typeinfo, .value = varia.value, .left=NULL, .middle=NULL, .right=STB_LANG_AS_AST(assign));
             ) STB_LANG_ELSE_IF_TOKEN(TOKEN_LP,
                 STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
                 return STB_LANG_AST_FUNCALL(AST_FUNCALL, varia, args)
@@ -228,6 +245,19 @@ STB_LANG_PARSE_EXPR(
             }
         }
 
+        if (strcmp(match_token.value, "ref") == 0){
+            STB_LANG_PARSER_EXPECT(TOKEN_LP);
+            STB_LANG_GET_AST_EXPR(exp, 0);
+            STB_LANG_PARSER_EXPECT(TOKEN_RP);
+            return STB_LANG_AST(.type = AST_REF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+        }
+
+        if (strcmp(match_token.value, "deref") == 0){
+            STB_LANG_PARSER_EXPECT(TOKEN_LP);
+            STB_LANG_GET_AST_EXPR(exp, 0);
+            STB_LANG_PARSER_EXPECT(TOKEN_RP);
+            return STB_LANG_AST(.type = AST_DEREF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+        }
 
         STB_LANG_SAVE(name, match_token)
         STB_LANG_IF_TOKEN(TOKEN_LP,
@@ -314,6 +344,17 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_EXPAND_PARAMS();
         STB_LANG_EXPAND_BLOCK();
     )
+    STB_LANG_TYPEINFO_CASE(AST_STORE, 
+        STB_LANG_EXPAND_LHS();
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_INFER_TYPE(ast->value);
+        ast->typeinfo = STB_LANG_LHS(ast)->typeinfo;
+        if (ast->typeinfo.ptrnum == 0){
+            STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer");
+        };
+        ast->typeinfo.ptrnum--;
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+    )
     STB_LANG_TYPEINFO_CASE(AST_ASSIGN, 
         STB_LANG_EXPAND_RHS();
         STB_LANG_INFER_TYPE(ast->value);
@@ -372,6 +413,23 @@ STB_LANG_NEW_TYPEINFO(
     STB_LANG_TYPEINFO_CASE(AST_CAST,
         STB_LANG_EXPAND_LHS();
     )
+    STB_LANG_TYPEINFO_CASE(AST_REF,
+        STB_LANG_EXPAND_LHS();
+
+        Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
+        typinf.ptrnum++;
+        ast->typeinfo = typinf;
+    )
+    STB_LANG_TYPEINFO_CASE(AST_DEREF,
+        STB_LANG_EXPAND_LHS();
+
+        Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
+        if (typinf.ptrnum == 0){
+            STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer");
+        }
+        typinf.ptrnum--;
+        ast->typeinfo = typinf;
+    )
     STB_LANG_TYPEINFO_CASE(AST_EXPR,
         STB_LANG_EXPAND_LHS();
     )
@@ -417,7 +475,10 @@ STB_LANG_NEW_IR(
         IR_BAND,
         IR_AND,
         IR_OR,
-        IR_XOR
+        IR_XOR,
+        IR_ADDR,
+        IR_LOAD,
+        IR_STORE
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
@@ -439,6 +500,11 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         STB_LANG_IR_CASE(AST_ASSIGN,
             STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND(IR_VAR, ast->value), STB_LANG_IR_RHS(), NULL);
         )
+
+        STB_LANG_IR_CASE(AST_STORE,
+            STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_LHS(), STB_LANG_IR_RHS(), NULL);
+        )
+
         STB_LANG_IR_CASE(AST_VAR,
             STB_LANG_IR_RETURN_SELF(IR_VAR);
         )
@@ -589,6 +655,18 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         STB_LANG_IR_CASE(AST_EXPR,
             return STB_LANG_IR_GET_OPERAND(ast->left);
         )
+        STB_LANG_IR_CASE(AST_REF,
+            STB_LANG_IR_NEW_TEMP(dest);
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_AS_TEMP(IR_REG, dest), operand, NULL);
+            return STB_LANG_IR_AS_TEMP(IR_REG, dest);
+        )
+        STB_LANG_IR_CASE(AST_DEREF,
+            STB_LANG_IR_NEW_TEMP(dest);
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_LANG_IR_EMIT(IR_LOAD, STB_LANG_IR_AS_TEMP(IR_REG, dest), operand, NULL);
+            return STB_LANG_IR_AS_TEMP(IR_REG, dest);
+        )
         STB_LANG_IR_CASE(AST_WHILE,
             STB_LANG_IR_NEW_LABEL(label)
             STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label), NULL, NULL);
@@ -624,6 +702,12 @@ STB_LANG_NEW_REGALLOC(
         STB_LANG_REGALLOC_2CASES(IR_ASSIGN, IR_DECL,
             STB_LANG_SAVE_REG(phys[0]);
         )
+        STB_LANG_REGALLOC_CASE(IR_STORE,
+            STB_LANG_SAVE_REG(phys[0], {
+                STB_LANG_SAVE_REG(phys[1]);
+            });
+            STB_LANG_EXPAND_OPERAND(right, IR_REG)
+        )
         STB_LANG_REGALLOC_CASE(IR_JUMP_IF_FALSE,
             STB_LANG_EXPAND_OPERAND(right, IR_REG)
         )
@@ -655,6 +739,15 @@ STB_LANG_NEW_REGALLOC(
             STB_LANG_SAVE_REG(phys[0], {
                 STB_LANG_SAVE_REG(phys[1]);
             });
+        )
+        STB_LANG_REGALLOC_CASE(IR_ADDR,
+            STB_LANG_EXPAND_OPERAND(dest, IR_REG)
+        )
+        STB_LANG_REGALLOC_CASE(IR_LOAD,
+            STB_LANG_SAVE_REG(phys[0]);
+            STB_LANG_EXPAND_OPERAND(dest, IR_REG)
+            STB_LANG_EXPAND_OPERAND(left, IR_REG)
+            STB_LANG_EXPAND_OPERAND(right, IR_REG)
         )
         STB_LANG_REGALLOC_CASE(IR_MOD,
             STB_CONCAT(CUR_REGALLOC_NAME, _Reg) right;
@@ -719,6 +812,8 @@ if (right != NULL) { \
     } \
 } \
 }
+
+
 
 #define STB_LANG_ARM_BINARY(op) \
 STB_LANG_ARM_MOVE(instr->left, STB_LANG_REGISTER(instr->phys[0], 8)); \
@@ -785,6 +880,32 @@ STB_LANG_NEW_CODEGEN(
         )
         STB_LANG_CODEGEN_CASE(IR_LABEL,
             STB_LANG_EMIT_CODE(".L_label_%s:\n", instr->dest->value)
+        )
+        STB_LANG_CODEGEN_CASE(IR_ADDR,
+            char *dest = STB_LANG_REGISTER(instr->dest->phys, 8);
+            if (instr->left->type == IR_VAR){
+                int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value);
+                if (newoffset == 0) {
+                    STB_LANG_EMIT_CODE("\tmov %s, sp\n", dest);
+                } else {
+                    STB_LANG_EMIT_CODE("\tadd %s, sp, #%d\n", dest, newoffset);
+                }
+            }
+        )
+        STB_LANG_CODEGEN_CASE(IR_LOAD,
+            char *dest = STB_LANG_REGISTER(instr->dest->phys, 8);
+            char *tmp = STB_LANG_REGISTER(instr->phys[0], 8);
+            STB_LANG_ARM_MOVE(instr->left, tmp);
+            STB_LANG_EMIT_CODE("\tldr %s, [%s]\n", dest, tmp);
+        )
+        STB_LANG_CODEGEN_CASE(IR_STORE,
+            char *val_reg = STB_LANG_REGISTER(instr->phys[0], 8);
+            STB_LANG_ARM_MOVE(instr->left, val_reg);
+
+            char *addr_reg = STB_LANG_REGISTER(instr->phys[1], 8);
+            STB_LANG_ARM_MOVE(instr->dest, addr_reg);
+
+            STB_LANG_EMIT_CODE("\tstr %s, [%s]\n", val_reg, addr_reg);
         )
         STB_LANG_CODEGEN_2CASES(IR_ASSIGN, IR_DECL,
             // TODO: merge this entirely with STB_LANG_ARM_MOVE
