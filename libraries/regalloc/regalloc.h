@@ -271,7 +271,6 @@ if (instr->place->type == arg){ \
     snprintf(instr->dest->value, 10, "x%d", atoi(instr->place->value + 1)); \
 }else 
 
-#define STB_LANG_REGALLOC_RESOLVE(place) \
 
 
 

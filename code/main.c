@@ -49,7 +49,12 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_LTE,
         TOKEN_DEQ,
         TOKEN_NEQ,
-        TOKEN_NOT
+        TOKEN_NOT,
+        TOKEN_AND,
+        TOKEN_BAND,
+        TOKEN_OR,
+        TOKEN_BOR,
+        TOKEN_CARET
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
@@ -62,6 +67,7 @@ STB_LANG_NEW_TOKENIZER(
         STB_LANG_TOKEN_CHAR('*', TOKEN_MUL)
         STB_LANG_TOKEN_CHAR('/', TOKEN_DIV)
         STB_LANG_TOKEN_CHAR('%', TOKEN_MODULO)
+        STB_LANG_TOKEN_CHAR('^', TOKEN_CARET)
         STB_LANG_SKIP('\n')
     ),
     STB_LANG_ALPHA(TOKEN_ID)
@@ -71,6 +77,8 @@ STB_LANG_NEW_TOKENIZER(
     STB_LANG_TOKEN_DOUBLE_CHAR("<=", TOKEN_LTE, TOKEN_LT)
     STB_LANG_TOKEN_DOUBLE_CHAR("==", TOKEN_DEQ, TOKEN_EQ)
     STB_LANG_TOKEN_DOUBLE_CHAR("!=", TOKEN_NEQ, TOKEN_NOT)
+    STB_LANG_TOKEN_DOUBLE_CHAR("&&", TOKEN_AND, TOKEN_BAND)
+    STB_LANG_TOKEN_DOUBLE_CHAR("||", TOKEN_OR, TOKEN_BOR)
     STB_LANG_SKIP(' ')
 )
 
@@ -90,12 +98,23 @@ STB_LANG_DEFINE_TYPEINFO(
 
 STB_LANG_NEW_PARSER(
 STB_LANG_BINDING_POWER(
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_LT, 5)
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_LTE, 5)
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_GT, 5)
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_GTE, 5)
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_DEQ, 5)
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_NEQ, 5)
+
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_OR, 1)
+
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_CARET, 2)
+
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_AND, 3)
+
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_BOR, 4)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_BAND, 5)
+
+
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_LT, 6)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_LTE, 6)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_GT, 6)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_GTE, 6)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_DEQ, 6)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_NEQ, 6)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_ADD, 10)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_SUB, 10)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_MUL, 20)
@@ -124,7 +143,12 @@ STB_LANG_ASTS(
     AST_NEQ,
     AST_RET,
     AST_STRING,
-    AST_CAST
+    AST_CAST,
+    AST_OR,
+    AST_AND,
+    AST_BOR,
+    AST_BAND,
+    AST_XOR
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_GET_TYPEINFO(typeinfo){
@@ -234,6 +258,11 @@ STB_LANG_PARSE_EXPR(
         STB_LANG_TOKEN_MATCH_AST(TOKEN_GTE, AST_GTE)
         STB_LANG_TOKEN_MATCH_AST(TOKEN_DEQ, AST_EQ)
         STB_LANG_TOKEN_MATCH_AST(TOKEN_NEQ, AST_NEQ)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_OR, AST_OR)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_BOR, AST_BOR)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_AND, AST_AND)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_BAND, AST_BAND)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_CARET, AST_XOR)
     )
 ),
 STB_LANG_PARSE_TYPEINFO(
@@ -314,6 +343,11 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
     )
+    STB_LANG_TYPEINFO_5CASES(AST_AND, AST_OR, AST_BAND, AST_BOR, AST_XOR,
+        STB_LANG_EXPAND_RHS();
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+    )
     STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
         STB_LANG_EXPAND_ARGS();
         STB_LANG_FIND_FUNCTION(ast->value, 
@@ -373,7 +407,12 @@ STB_LANG_NEW_IR(
         IR_JUMP,
         IR_LABEL,
         IR_RET,
-        IR_CAST
+        IR_CAST,
+        IR_BOR,
+        IR_BAND,
+        IR_AND,
+        IR_OR,
+        IR_XOR
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDEF,
@@ -463,6 +502,31 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         STB_LANG_IR_CASE(AST_MODULO,
             STB_LANG_IR_NEW_TEMP(temp_reg);
             STB_LANG_IR_EMIT(IR_MOD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_BOR,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_BOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_BAND,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_BAND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_AND,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_AND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_OR,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_OR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_XOR,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_XOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS()); \
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_LT,
@@ -574,7 +638,12 @@ STB_LANG_NEW_REGALLOC(
                 };
             });
         )
-        STB_LANG_REGALLOC_2CASES(IR_MUL, IR_DIV,
+        STB_LANG_REGALLOC_6CASES(IR_MUL, IR_DIV, IR_BOR, IR_BAND, IR_AND, IR_OR,
+            STB_LANG_SAVE_REG(phys[0], {
+                STB_LANG_SAVE_REG(phys[1]);
+            });
+        )
+        STB_LANG_REGALLOC_CASE(IR_XOR,
             STB_LANG_SAVE_REG(phys[0], {
                 STB_LANG_SAVE_REG(phys[1]);
             });
@@ -781,6 +850,45 @@ STB_LANG_NEW_CODEGEN(
             {
                 STB_LANG_EMIT_CODE("\tmsub %s, %s, %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), tmp, right, left, 8);
             }
+        )
+        STB_LANG_CODEGEN_CASE(IR_BOR,
+            STB_LANG_ARM_BINARY("orr")
+        )
+        STB_LANG_CODEGEN_CASE(IR_BAND,
+            STB_LANG_ARM_BINARY("and")
+        )
+        STB_LANG_CODEGEN_CASE(IR_XOR,
+            STB_LANG_ARM_BINARY("eor")
+        )
+        STB_LANG_CODEGEN_CASE(IR_AND,
+            char *left = STB_LANG_REGISTER(instr->phys[0], 8);
+            char *right = STB_LANG_REGISTER(instr->phys[1], 8);
+            STB_LANG_ARM_MOVE(instr->left, left);
+            STB_LANG_ARM_MOVE(instr->right, right);
+
+            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", left, 0); \
+            STB_LANG_EMIT_CODE("\tcset %s, ne\n", left); \
+
+
+            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", right, 0); \
+            STB_LANG_EMIT_CODE("\tcset %s, ne\n", right); \
+
+            STB_LANG_EMIT_CODE("\tand %s, %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), left, right); \
+        )
+        STB_LANG_CODEGEN_CASE(IR_OR,
+            char *left = STB_LANG_REGISTER(instr->phys[0], 8);
+            char *right = STB_LANG_REGISTER(instr->phys[1], 8);
+            STB_LANG_ARM_MOVE(instr->left, left);
+            STB_LANG_ARM_MOVE(instr->right, right);
+
+            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", left, 0); \
+            STB_LANG_EMIT_CODE("\tcset %s, ne\n", left); \
+
+
+            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", right, 0); \
+            STB_LANG_EMIT_CODE("\tcset %s, ne\n", right); \
+
+            STB_LANG_EMIT_CODE("\torr %s, %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), left, right); \
         )
         STB_LANG_CODEGEN_CASE(IR_LT,
             STB_LANG_ARM_COMPARISON("lt")
