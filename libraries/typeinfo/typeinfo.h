@@ -82,6 +82,14 @@ while (param != NULL){ \
     param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)param->next; \
 }
 
+#define STB_LANG_FUNCTION_ALLOCATE(from, bytes) \
+STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) *symbols = &((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(from->current_scope))->symbols;\
+for (int v=0; v<symbols->datalen; v++){ \
+    if (symbols->data[v].kind == STB_LANG_SYMBOL_VARIABLE){ \
+        symbols->data[v].data.variable.offset += bytes; \
+    } \
+}
+
 #define STB_LANG_FUNCTION_CHECK_LIST(params) \
 STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo) *typeinfos = function.data.function.args; \
 STB_CONCAT(CUR_PARSER_NAME, _AST) *param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)params; \
@@ -93,12 +101,7 @@ for (int i=0; i<typeinfos->datalen; i++){ \
             argidx++; \
             param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)param->next; \
         } \
-        STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) *symbols = &((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(checker->current_scope))->symbols;\
-        for (int v=0; v<symbols->datalen; v++){ \
-            if (symbols->data[v].kind == STB_LANG_SYMBOL_VARIABLE){ \
-                symbols->data[v].data.variable.offset += argidx * 8; \
-            } \
-        } \
+        STB_LANG_FUNCTION_ALLOCATE(checker, argidx * 8); \
         goto escape; \
         break; \
     } \

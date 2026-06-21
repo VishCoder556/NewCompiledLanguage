@@ -295,13 +295,13 @@ if (Generic == 1){ \
 STB_LANG_PARSER_EXPECT(endtok)
 
 
-#define STB_LANG_GET_AST_EXPR(where) STB_CONCAT(CUR_PARSER_NAME, _AST) *where = STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(parser, 0); STB_LANG_PARSER_UPDATE();
+#define STB_LANG_GET_AST_EXPR(where, binding_power) STB_CONCAT(CUR_PARSER_NAME, _AST) *where = STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(parser, binding_power); STB_LANG_PARSER_UPDATE();
 
 #define STB_LANG_PARSE_EXPR_LIST(into, starttok, splitA, endtok) \
 STB_CONCAT(CUR_PARSER_NAME, _ASTList) into = (STB_CONCAT(CUR_PARSER_NAME, _ASTList)){0}; \
 InitLinkedList(into, STB_CONCAT(CUR_PARSER_NAME, _AST)); \
 STB_LANG_PARSE_CUSTOM_LIST(starttok, splitA, endtok,  \
-    STB_LANG_GET_AST_EXPR(ast); \
+    STB_LANG_GET_AST_EXPR(ast, 0); \
     AppendToLinkedList(into, STB_CONCAT(CUR_PARSER_NAME, _AST), *ast); \
 )
 

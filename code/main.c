@@ -98,14 +98,10 @@ STB_LANG_DEFINE_TYPEINFO(
 
 STB_LANG_NEW_PARSER(
 STB_LANG_BINDING_POWER(
-
     STB_LANG_MATCH_BINDING_POWER(TOKEN_OR, 1)
-
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_CARET, 2)
-
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_AND, 3)
-
-    STB_LANG_MATCH_BINDING_POWER(TOKEN_BOR, 4)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_AND, 2)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_BOR, 3)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_CARET, 4)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_BAND, 5)
 
 
@@ -148,7 +144,8 @@ STB_LANG_ASTS(
     AST_AND,
     AST_BOR,
     AST_BAND,
-    AST_XOR
+    AST_XOR,
+    AST_EXPR
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_GET_TYPEINFO(typeinfo){
@@ -225,7 +222,7 @@ STB_LANG_PARSE_EXPR(
             STB_LANG_GET_TYPEINFO(typeinfo){
                 STB_LANG_PARSER_ADVANCE()
                 STB_LANG_PARSER_EXPECT(TOKEN_COMMA);
-                STB_LANG_GET_AST_EXPR(exp);
+                STB_LANG_GET_AST_EXPR(exp, 0);
                 STB_LANG_PARSER_EXPECT(TOKEN_RP);
                 return STB_LANG_AST(.type = AST_CAST, .typeinfo = typeinfo, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
             }
@@ -239,6 +236,11 @@ STB_LANG_PARSE_EXPR(
         ) STB_LANG_ELSE(
             left = STB_LANG_AST_LITERAL(AST_VAR, name);
         )
+    )
+    STB_LANG_MATCH_TOKEN(TOKEN_LP,  
+        STB_LANG_GET_AST_EXPR(l, 2);
+        STB_LANG_PARSER_EXPECT(TOKEN_RP);
+        left = STB_LANG_AST(.type = AST_EXPR, .left = STB_LANG_AS_AST(l))
     )
     STB_LANG_MATCH_TOKEN(TOKEN_NUM,  
         left = STB_LANG_AST_LITERAL(AST_INT, match_token);
@@ -368,6 +370,9 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_EXPAND_ARGS();
     )
     STB_LANG_TYPEINFO_CASE(AST_CAST,
+        STB_LANG_EXPAND_LHS();
+    )
+    STB_LANG_TYPEINFO_CASE(AST_EXPR,
         STB_LANG_EXPAND_LHS();
     )
 )
@@ -581,6 +586,9 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         STB_LANG_IR_CASE(AST_CAST,
             return STB_LANG_IR_GET_OPERAND(ast->left);
         )
+        STB_LANG_IR_CASE(AST_EXPR,
+            return STB_LANG_IR_GET_OPERAND(ast->left);
+        )
         STB_LANG_IR_CASE(AST_WHILE,
             STB_LANG_IR_NEW_LABEL(label)
             STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, label), NULL, NULL);
@@ -752,6 +760,8 @@ STB_LANG_NEW_CODEGEN(
             STB_LANG_EMIT_CODE("_%s:\n", instr->dest->value);
             STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n");
             STB_LANG_EMIT_CODE("\tmov x29, sp\n");
+
+            // STB_LANG_FUNCTION_ALLOCATE(gen, 8);
             int offset = 16;
             STB_LANG_GO_TO_FUNC(instr->dest->value);
             STB_LANG_ITERATE(STB_LANG_CURRENT_SCOPE()->symbols, Lang_TypeInfo_Symbol,
@@ -759,11 +769,18 @@ STB_LANG_NEW_CODEGEN(
                     offset = iter.data.variable.offset;
                 };
             );
-            STB_LANG_EMIT_CODE("\tsub sp, sp, #%d\n", (offset + 15) & ~15); \
+            STB_LANG_EMIT_CODE("\tsub sp, sp, #%d\n", (offset + 15 + 8) & ~15); \
         )
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
-            STB_LANG_EMIT_CODE("\tmov sp, x29\n"); \
-            STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n"); \
+            STB_LANG_EMIT_CODE("\tmov sp, x29\n");
+            STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n");
+            STB_LANG_EMIT_CODE("\tret\n");
+        )
+        STB_LANG_CODEGEN_CASE(IR_RET,
+            STB_LANG_ARM_MOVE(instr->left, "x0")
+
+            STB_LANG_EMIT_CODE("\tmov sp, x29\n");
+            STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n");
             STB_LANG_EMIT_CODE("\tret\n");
         )
         STB_LANG_CODEGEN_CASE(IR_LABEL,
@@ -813,13 +830,6 @@ STB_LANG_NEW_CODEGEN(
         )
         STB_LANG_CODEGEN_CASE(IR_CALL,
             STB_LANG_EMIT_CODE("\tbl _%s\n", instr->dest->value);
-        )
-        STB_LANG_CODEGEN_CASE(IR_RET,
-            STB_LANG_ARM_MOVE(instr->left, "x0")
-
-            STB_LANG_EMIT_CODE("\tmov sp, x29\n"); \
-            STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n"); \
-            STB_LANG_EMIT_CODE("\tret\n");
         )
         STB_LANG_CODEGEN_CASE(IR_JUMP,
             STB_LANG_EMIT_CODE("\tb .L_label_%s\n", instr->dest->value);
