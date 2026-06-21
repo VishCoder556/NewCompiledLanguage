@@ -1,7 +1,7 @@
 int main(int argc, ptr<string> argv){
     int i = 0
     while (i < argc){
-        printf("Argument %d: %s\n", i, deref(argv))
+        printf("Argument %d: %s\n", i, deref(argv + cast(ptr<string>, i*8)))
         i = i + 1
     }
     return 0
