@@ -241,7 +241,8 @@ STB_LANG_PARSE_EXPR(
                 STB_LANG_PARSER_EXPECT(TOKEN_COMMA);
                 STB_LANG_GET_AST_EXPR(exp, 0);
                 STB_LANG_PARSER_EXPECT(TOKEN_RP);
-                return STB_LANG_AST(.type = AST_CAST, .typeinfo = typeinfo, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+                left = STB_LANG_AST(.type = AST_CAST, .typeinfo = typeinfo, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+                goto skip;
             }
         }
 
@@ -249,14 +250,16 @@ STB_LANG_PARSE_EXPR(
             STB_LANG_PARSER_EXPECT(TOKEN_LP);
             STB_LANG_GET_AST_EXPR(exp, 0);
             STB_LANG_PARSER_EXPECT(TOKEN_RP);
-            return STB_LANG_AST(.type = AST_REF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+            left = STB_LANG_AST(.type = AST_REF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+            goto skip;
         }
 
         if (strcmp(match_token.value, "deref") == 0){
             STB_LANG_PARSER_EXPECT(TOKEN_LP);
             STB_LANG_GET_AST_EXPR(exp, 0);
             STB_LANG_PARSER_EXPECT(TOKEN_RP);
-            return STB_LANG_AST(.type = AST_DEREF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+            left = STB_LANG_AST(.type = AST_DEREF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
+            goto skip;
         }
 
         STB_LANG_SAVE(name, match_token)
@@ -278,6 +281,7 @@ STB_LANG_PARSE_EXPR(
     STB_LANG_MATCH_TOKEN(TOKEN_STRING,  
         left = STB_LANG_AST_LITERAL(AST_STRING, match_token);
     )
+skip:
     STB_LANG_PRATT_PARSER(
         STB_LANG_TOKEN_MATCH_AST(TOKEN_ADD, AST_ADD)
         STB_LANG_TOKEN_MATCH_AST(TOKEN_SUB, AST_SUB)
@@ -316,7 +320,7 @@ STB_LANG_PARSE_TYPEINFO(
         typeinfo.type = AST_TYPE_INT;
     )
     STB_LANG_IF_VALUE(TOKEN_ID, "string",
-        typeinfo.type = AST_TYPE_INT;
+        typeinfo.type = AST_TYPE_STRING;
     )
     return typeinfo;
 )
@@ -382,8 +386,9 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
     )
     STB_LANG_TYPEINFO_5CASES(AST_ADD, AST_SUB, AST_MUL, AST_DIV, AST_MODULO,
+        STB_LANG_EXPAND_LHS();
         STB_LANG_EXPAND_RHS();
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
     )
     STB_LANG_TYPEINFO_5CASES(AST_AND, AST_OR, AST_BAND, AST_BOR, AST_XOR,
@@ -808,7 +813,8 @@ if (right != NULL) { \
             STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_REGISTER(right->phys, 8)); \
         } \
     }else if (right->type == IR_MEM){ \
-        STB_LANG_EMIT_CODE("\tadr %s, mem_%ld\n", leftr, (long)right->value); \
+        STB_LANG_EMIT_CODE("\tadrp %s, mem_%ld@PAGE\n", leftr, (long)right->value); \
+        STB_LANG_EMIT_CODE("\tadd %s, %s, mem_%ld@PAGEOFF\n", leftr, leftr, (long)right->value); \
     } \
 } \
 }
@@ -844,6 +850,8 @@ STB_LANG_NEW_CODEGEN(
         STB_LANG_EMIT_CODE("%s\n", ".align 2");
     ),
     STB_LANG_CODEGEN_SUFFIX(
+        STB_LANG_EMIT_CODE(".data\n");
+        STB_LANG_EMIT_CODE(".align 3\n");
         STB_LANG_ITERATE(gen->symbols, Lang_IR_Symbol, 
 // This looks wrong, but there are variables idx and iter used in the iterate function
 // This is not meant to be used that seriously, so take it with a grain of salt.
@@ -1115,8 +1123,8 @@ int main(int argc, char **argv){
     }
 
     STB_LANG_INVOKE_DRIVER(gen);
-    // printf("-------- ASSEMBLY CODE --------\n");
-    // printf("%s", gen->code.data);
-    // printf("-------------------------------\n");
+    printf("-------- ASSEMBLY CODE --------\n");
+    printf("%s", gen->code.data);
+    printf("-------------------------------\n");
     return 0;
 }

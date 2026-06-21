@@ -1,7 +1,6 @@
 int main(int argc, int argv){
-    int i = 5;
-    ptr<int> a = ref(i)
-    deref(a) = 10
-    printf("%d\n", i)
+    string a = "Trim: Hello World"
+    ptr<int> str = cast(ptr<int>, a)
+    printf("%s\n", str + cast(ptr<int>, 6))
     return 0
 }
