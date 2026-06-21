@@ -38,7 +38,7 @@ STB_LANG_IR_RUN(ast->right);
 // no function call implemented yet, we won't have to worry about pushing
 
 
-#define STB_LANG_IR_OPERAND_NAME(typ, val) ({ \
+#define STB_LANG_IR_OPERAND(typ, val) ({ \
     STB_CONCAT(CUR_IR_NAME, _Operand) *op = malloc(sizeof(*op)); \
     op->type = typ; \
     op->value = val; \
@@ -47,12 +47,14 @@ STB_LANG_IR_RUN(ast->right);
     op; \
 })
 
-#define STB_LANG_IR_RETURN_SELF(type) return STB_LANG_IR_OPERAND_NAME(type, ast->value);
+#define STB_LANG_IR_RETURN_SELF(type) return STB_LANG_IR_OPERAND(type, ast->value);
 
 #define STB_LANG_IR_NEW_TEMP(temp_reg) char *temp_reg = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
-#define STB_LANG_IR_AS_TEMP(reg, temp_reg) STB_LANG_IR_OPERAND_NAME(reg, temp_reg)
+#define STB_LANG_IR_AS_TEMP(reg, temp_reg) STB_LANG_IR_OPERAND(reg, temp_reg)
 #define STB_LANG_IR_NEW_LABEL(label) char *label = STB_CONCAT(CUR_IR_PREFIX, _make_temp_label_name)(ir);
-#define STB_LANG_IR_LABEL(var, label) STB_LANG_IR_OPERAND_NAME(var, label)
+#define STB_LANG_IR_LABEL(var, label) STB_LANG_IR_OPERAND(var, label)
+
+#define STB_LANG_IR_GET_OPERAND(ast) STB_CONCAT(CUR_IR_PREFIX, _ast)(ir, (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast)
 
 
 

@@ -22,15 +22,15 @@
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 3)
 
-#define STB_LANG_ADD_VARIABLE(typeinf, scp, ...) do {if(typeinf != -1) { \
+#define STB_LANG_ADD_VARIABLE(typeinf, scp, ...) do {if(typeinf.type != -1) { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = __VA_ARGS__; \
     symbol.data.variable.offset = checker->entry_offset; \
     checker->entry_offset += STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(symbol.typeinfo); \
     STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(scp, symbol);} \
 }while(0);
 
-#define STB_LANG_ADD_FUNCTION(nam, typinf, ...) do { \
-    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) function = (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) {.name=nam, .typeinfo=typinf, .kind = STB_LANG_SYMBOL_FUNCTION}; \
+#define STB_LANG_ADD_FUNCTION(nam, ...) do { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) function = (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) {.name=nam, .kind = STB_LANG_SYMBOL_FUNCTION}; \
     function.data.function.args = malloc(sizeof(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo))); \
     *function.data.function.args = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo), _new)(); \
     __VA_ARGS__; \
@@ -67,6 +67,9 @@ while (head != NULL){ \
 #define STB_LANG_FUNCTION_ADD_PARAM(...) \
 STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo), _add)(function.data.function.args, (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo))__VA_ARGS__);
 
+#define STB_LANG_FUNCTION_RETURN(...) \
+function.typeinfo = (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo))__VA_ARGS__;
+
 #define STB_LANG_GET_AST(what) (STB_CONCAT(CUR_PARSER_NAME, _AST)*)what
 
 #define STB_LANG_AST_LINKED_LIST(what) STB_LANG_AS_AST(GetLinkedListHead(STB_LANG_AST_LINKED_LIST(what, STB_CONCAT(CUR_PARSER_NAME, _AST)))
@@ -83,10 +86,10 @@ while (param != NULL){ \
 STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo) *typeinfos = function.data.function.args; \
 STB_CONCAT(CUR_PARSER_NAME, _AST) *param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)params; \
 for (int i=0; i<typeinfos->datalen; i++){ \
-    if (typeinfos->data[i] == STB_LANG_AST_TYPE_VARIADIC){ \
+    if (typeinfos->data[i].type == STB_LANG_TYPEINFO_VARIADIC){ \
         int argidx = 0; \
         while (param != NULL) { \
-            param->flags = STB_LANG_AST_TYPE_VARIADIC; \
+            param->flags = STB_LANG_TYPEINFO_VARIADIC; \
             argidx++; \
             param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)param->next; \
         } \
@@ -100,13 +103,13 @@ for (int i=0; i<typeinfos->datalen; i++){ \
         break; \
     } \
     if (param == NULL){ \
-        stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too few function arguments provided"); \
+        stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too few function arguments provided to function \"%s\"", function.name); \
     } \
     STB_LANG_EXPECT_TYPEINFO_EQ(param->typeinfo, typeinfos->data[i], ast->offset); \
     param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)param->next; \
 } \
 if (param != NULL){ \
-    stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too many function arguments provided"); \
+    stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too many function arguments provided to function \"%s\"", function.name); \
 } \
 escape: \
 
@@ -128,7 +131,7 @@ STB_LANG_ADD_VARIABLE(typeinf, \
 
 #define STB_LANG_INFER_TYPE(nam) \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(checker->current_scope), nam); \
-if (symbol.typeinfo != -1) {ast->typeinfo = symbol.typeinfo;}
+if (symbol.typeinfo.type != -1) {ast->typeinfo = symbol.typeinfo;}
 
 #define STB_LANG_SCOPE_MAKE_CHILD(paren, curscope, ...) \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* news = ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)paren); \
@@ -144,7 +147,7 @@ typedef enum { \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)); \
 typedef struct { \
     char *name; \
-    int typeinfo; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) typeinfo; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _SymbolKind) kind; \
     union {; \
         struct { \
@@ -284,7 +287,11 @@ STB_LANG_EXPAND_LIST(ast->right); \
     checker->entry_offset = 0; \
 }while(0);
 
-#define STB_LANG_TYPEINFO_ASSUME_TYPE(typ) if (ast->typeinfo == -1) {ast->typeinfo = typ;}
+#define STB_LANG_TYPEINFO_ASSUME_TYPE(typ) if (ast->typeinfo.type == -1) { \
+    ast->typeinfo.type = typ.type; \
+}
+
+#define STB_LANG_TYPEINFO(...) (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)){.type=__VA_ARGS__, .ptrnum=0}
 
 #define STB_LANG_LHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left)
 #define STB_LANG_RHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->right)
@@ -293,8 +300,9 @@ STB_LANG_EXPAND_LIST(ast->right); \
 
 
 #define STB_LANG_EXPAND_RHS() do{ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_RHS(ast));}while(0);
+#define STB_LANG_EXPAND_LHS() do{ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_LHS(ast));}while(0);
 
-#define STB_LANG_EXPECT_TYPEINFO_EQ(left, right, offset) if (left != right){ \
+#define STB_LANG_EXPECT_TYPEINFO_EQ(left, right, offset) if (left.type != right.type || left.ptrnum != right.ptrnum){ \
 stb_lang_error_minor(checker->file.name, checker->file.contents, offset, "TypeinfoError", "Expected types to be equal"); \
 }
 
