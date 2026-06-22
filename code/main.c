@@ -801,9 +801,18 @@ skip_store:
             STB_LANG_IR_NEW_TEMP(dest);
             STB_LANG_IR_NEW_TEMP(temp_reg);
             STB_LANG_IR_NEW_TEMP(temp2);
-            char str[32]; snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(&ast->typeinfo));
+            char str[32]; 
+            if (STB_LANG_LHS(ast)->typeinfo.type == AST_TYPE_ARRAY) {
+                snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(STB_LANG_LHS(ast)->typeinfo.data.array.elem_type));
+            } else {
+                snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(&ast->typeinfo));
+            }
             STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND(IR_REG, temp_reg), STB_LANG_IR_RHS(ast), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
-            STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_LHS(ast), NULL);
+            if (STB_LANG_LHS(ast)->typeinfo.type == AST_TYPE_ARRAY) {
+                STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_LHS(ast), NULL);
+            }else {
+                STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_LHS(ast), NULL);
+            }
             STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_OPERAND(IR_REG, temp_reg));
             STB_LANG_IR_EMIT(IR_LOAD, STB_LANG_IR_AS_TEMP(IR_REG, dest), STB_LANG_IR_OPERAND(IR_REG, temp2), NULL);
             return STB_LANG_IR_AS_TEMP(IR_REG, dest);
@@ -1008,7 +1017,7 @@ STB_LANG_NEW_CODEGEN(
                     offset = iter.data.variable.offset;
                 };
             );
-            STB_LANG_EMIT_CODE("\tsub sp, sp, #%d\n", (offset + 15 + 8) & ~15);
+            STB_LANG_EMIT_CODE("\tsub sp, sp, #%d\n", (offset + 15 + 16) & ~15);
         )
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
             STB_LANG_EMIT_CODE("\tmov sp, x29\n");
