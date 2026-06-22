@@ -94,16 +94,19 @@ STB_LANG_NEW_TOKENIZER(
 
 #define CUR_TYPEINFO_NAME Lang_TypeInfo
 #define CUR_TYPEINFO_PREFIX lang_typeinfo
-STB_LANG_DEFINE_TYPEINFO(
-    AST_TYPE_VOID,
-    AST_TYPE_INT,
-    AST_TYPE_STRING,
-    AST_TYPE_ARRAY
-)
 
 
 #define CUR_PARSER_NAME Lang_Parser
 #define CUR_PARSER_PREFIX lang_parser
+
+STB_LANG_DEFINE_TYPEINFO(
+    AST_TYPE_VOID,
+    AST_TYPE_INT,
+    AST_TYPE_STRING,
+    AST_TYPE_ARRAY,
+    AST_TYPE_STRUCT
+)
+
 
 STB_LANG_NEW_PARSER(
 STB_LANG_BINDING_POWER(
@@ -162,9 +165,31 @@ STB_LANG_ASTS(
     AST_REF,
     AST_DEREF,
     AST_STORE,
-    AST_INDEX
+    AST_INDEX,
+    AST_STRUCT
 ),
 STB_LANG_PARSE_BODY(
+    STB_LANG_IF_VALUE(TOKEN_ID, "struct",
+        STB_LANG_PARSER_ADVANCE();
+        STB_LANG_SAVE(struct_name, token);
+        STB_LANG_PARSER_ADVANCE();
+        STB_CONCAT(CUR_PARSER_NAME, _ASTList) fields = (STB_CONCAT(CUR_PARSER_NAME, _ASTList)){0};
+        InitLinkedList(fields, STB_CONCAT(CUR_PARSER_NAME, _AST));
+        STB_LANG_PARSE_CUSTOM_LIST(TOKEN_LB, -1, TOKEN_RB,
+            STB_LANG_GET_TYPEINFO(argt){
+                STB_LANG_IF_TOKEN(TOKEN_ID,
+                    STB_CONCAT(CUR_PARSER_NAME, _AST) ast = (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type=AST_VAR, .typeinfo=argt, .value=match_token.value, .offset=offset};
+                    AppendToLinkedList(fields, STB_CONCAT(CUR_PARSER_NAME, _AST), ast);
+                )
+                STB_LANG_PARSER_ADVANCE();
+            }
+        )
+        Lang_TypeInfo_Typeinfo typeinfo = STB_LANG_TYPEINFO(.type=AST_TYPE_STRUCT, .ptrnum=0);
+        typeinfo.data.struct1.name = struct_name.value;
+        typeinfo.data.struct1.symbol = NULL;
+        typeinfo.data.struct1.size = -1;
+        return STB_LANG_AST(.type=AST_STRUCT, .typeinfo=typeinfo, .value=struct_name.value, .left=STB_LANG_LINKED_LIST(fields), .right=NULL);
+    )
     STB_LANG_GET_TYPEINFO(typeinfo){
         STB_LANG_IF_TOKEN(TOKEN_ID, // Function name
             STB_LANG_PARSER_ADVANCE();
@@ -375,6 +400,15 @@ STB_LANG_PARSE_TYPEINFO(
         STB_LANG_PARSER_EXPECT(TOKEN_GT);
         return old;
     )
+    STB_LANG_IF_VALUE(TOKEN_ID, "struct",
+        typeinfo.type = AST_TYPE_STRUCT;
+        STB_LANG_PARSER_ADVANCE();
+        typeinfo.data.struct1.name = token.value;
+        typeinfo.data.struct1.symbol = NULL;
+        typeinfo.data.struct1.size = -1;
+        STB_LANG_PARSER_ADVANCE();
+        return typeinfo;
+    )
     STB_LANG_IF_VALUE(TOKEN_ID, "void",
         typeinfo.type = AST_TYPE_VOID;
         STB_LANG_PARSER_ADVANCE();
@@ -409,7 +443,17 @@ STB_LANG_TYPEINFO_SIZE(
         case AST_TYPE_VOID: return 0;
         case AST_TYPE_INT: return 8;
         case AST_TYPE_STRING: return 8;
-        case AST_TYPE_ARRAY: return STB_LANG_LOOKUP_SIZE(typeinfo.data.array.elem_type) * typeinfo.data.array.size;
+        case AST_TYPE_ARRAY: return STB_LANG_LOOKUP_SIZE(root_scope, typeinfo.data.array.elem_type) * typeinfo.data.array.size;
+        case AST_TYPE_STRUCT: {
+            STB_LANG_FIND_DATA(root_scope, typeinfo.data.struct1.name,
+                int size = 0;
+                Lang_Parser_AST *structdef = STB_LANG_LHS(STB_LANG_GET_AST(symnew.data.struct1.structdef));
+                STB_LANG_ITERATE_LINKED_LIST(structdef, field, Lang_Parser_AST,
+                    size += STB_LANG_LOOKUP_SIZE(root_scope, field);
+                )
+                return size;
+            );
+        }
         default: stb_lang_error_major_global("TypeError", "Size of type '%d' is unknown", typeinfo.type); return -1;
     }
 )
@@ -432,6 +476,18 @@ STB_LANG_NEW_TYPEINFO(
         )
         STB_LANG_EXPAND_PARAMS();
         STB_LANG_EXPAND_BLOCK();
+    )
+    STB_LANG_TYPEINFO_CASE(AST_STRUCT, 
+        int size = 0;
+        STB_LANG_ITERATE_LINKED_LIST(STB_LANG_GET_AST(ast->left), head, Lang_Parser_AST,
+            STB_LANG_EXPAND(head);
+            size += STB_LANG_LOOKUP_SIZE(checker->root_scope, head);
+        )
+        ast->typeinfo.data.struct1.size = size;
+        STB_LANG_ADD_DATA(ast->value, 
+            // STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
+            // STB_LANG_SET_SYMBOL(ast->typeinfo.data.struct1.symbol, STB_LANG_CURRENT_SYMBOL());
+        )
     )
     STB_LANG_TYPEINFO_CASE(AST_STORE, 
         STB_LANG_EXPAND_LHS();
@@ -472,10 +528,10 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_INFER_TYPE(ast->value);
     )
     STB_LANG_TYPEINFO_CASE(AST_INT,
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(AST_TYPE_INT));
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(.type=AST_TYPE_INT, .ptrnum=0));
     )
     STB_LANG_TYPEINFO_CASE(AST_STRING,
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(AST_TYPE_STRING));
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(.type=AST_TYPE_STRING, .ptrnum=0));
     )
     STB_LANG_TYPEINFO_6CASES(AST_LT, AST_LTE, AST_GT, AST_GTE, AST_EQ, AST_NEQ,
         STB_LANG_EXPAND_RHS();
@@ -495,8 +551,8 @@ STB_LANG_NEW_TYPEINFO(
     )
     STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
         STB_LANG_EXPAND_ARGS();
-        STB_LANG_FIND_FUNCTION(ast->value, 
-            STB_LANG_TYPEINFO_ASSUME_TYPE(function.typeinfo);
+        STB_LANG_FIND_FUNCTION(checker->root_scope, ast->value, 
+            STB_LANG_TYPEINFO_ASSUME_TYPE(symnew.typeinfo);
             STB_LANG_FUNCTION_CHECK_LIST(ast->left);
         )
     )
@@ -536,11 +592,14 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_EXPAND_LHS();
 
         Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
-        if (typinf.ptrnum == 0 && typinf.type != AST_TYPE_ARRAY){
-            STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not index anything that's not a pointer or array");
-        }
-        typinf.ptrnum--;
         ast->typeinfo = typinf;
+        if (ast->typeinfo.ptrnum != 0){
+            ast->typeinfo.ptrnum--;
+        }else if (ast->typeinfo.type == AST_TYPE_ARRAY){
+            ast->typeinfo = *(Lang_TypeInfo_Typeinfo*)(ast->typeinfo.data.array.elem_type);
+        }else {
+            STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
+        };
     )
     STB_LANG_TYPEINFO_CASE(AST_EXPR,
         STB_LANG_EXPAND_LHS();
@@ -615,13 +674,15 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         STB_LANG_IR_CASE(AST_ASSIGN,
             STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), NULL);
         )
+        STB_LANG_IR_CASE(AST_STRUCT,
+        )
 
         STB_LANG_IR_CASE(AST_STORE,
             if (STB_LANG_LHS(ast)->type == AST_INDEX){
                 STB_LANG_IR_NEW_TEMP(addr_reg);
                 STB_LANG_IR_NEW_TEMP(offset_reg);
 
-                char str[32]; snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(&STB_LANG_LHS(ast)->typeinfo));
+                char str[32]; snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(ir->root_scope, &STB_LANG_LHS(ast)->typeinfo));
                 // a[0] = 5
                 STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND(IR_REG, offset_reg), STB_LANG_IR_RHS(STB_LANG_LHS(ast)), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
                 STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
@@ -803,9 +864,9 @@ skip_store:
             STB_LANG_IR_NEW_TEMP(temp2);
             char str[32]; 
             if (STB_LANG_LHS(ast)->typeinfo.type == AST_TYPE_ARRAY) {
-                snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(STB_LANG_LHS(ast)->typeinfo.data.array.elem_type));
+                snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(ir->root_scope, STB_LANG_LHS(ast)->typeinfo.data.array.elem_type));
             } else {
-                snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(&ast->typeinfo));
+                snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(ir->root_scope, &ast->typeinfo));
             }
             STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND(IR_REG, temp_reg), STB_LANG_IR_RHS(ast), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
             if (STB_LANG_LHS(ast)->typeinfo.type == AST_TYPE_ARRAY) {
@@ -948,7 +1009,7 @@ if (right != NULL) { \
         } \
     }else if (right->type == IR_REG){ \
         if (right->value[0] == 'a'){ \
-            STB_LANG_EMIT_CODE("\tmov %s, x%d\n", leftr, atoi(right->value+1)); \
+            STB_LANG_EMIT_CODE("\tmov %s, x%d\n", leftr, atoi(right->value + 1)); \
         }else if (right->value[0] == '.'){ \
             int n = atoi(instr->dest->value + 4); \
             STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, n * 8); \

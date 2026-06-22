@@ -234,13 +234,13 @@ char STB_CONCAT(CUR_PARSER_PREFIX, _parse_body)(CUR_PARSER_NAME *parser) { \
 #define STB_LANG_MATCH_TYPEINFO(val, typeinfo) if(strcmp(match_token.value, val) == 0) {return typeinfo;}
 
 #define STB_LANG_TYPEINFO_SIZE(...) \
-int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) typeinfo){ \
+int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) typeinfo, STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) root_scope){ \
     if (typeinfo.type == -1) return -1; \
     __VA_ARGS__; \
     return -1; \
 }
 
-#define STB_LANG_LOOKUP_SIZE(typeinf) STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(*(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)*)typeinf)
+#define STB_LANG_LOOKUP_SIZE(root_scope, typeinf) STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(*(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)*)typeinf, root_scope)
 
 
 #define STB_LANG_PARSER_ERROR_MINOR(where, type, nam) \
@@ -253,6 +253,8 @@ typedef enum { \
     STB_LANG_TYPEINFO_NONE = -1, \
     __VA_ARGS__ \
 }STB_CONCAT(CUR_TYPEINFO_NAME, _TypeinfoType); \
+struct STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol); \
+struct STB_CONCAT(CUR_PARSER_NAME, _AST); \
 typedef struct { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _TypeinfoType) type; \
     int ptrnum; \
@@ -261,9 +263,47 @@ typedef struct { \
             int size; \
             struct AST_TypeInfo *elem_type; \
         } array; \
+        struct { \
+            int size; \
+            struct STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) *symbol; \
+            char *name; \
+        }struct1; \
     } data; \
-}STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo);
+}STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo); \
+typedef enum { \
+    STB_LANG_SYMBOL_VARIABLE, \
+    STB_LANG_SYMBOL_FUNCTION, \
+    STB_LANG_SYMBOL_DATA \
+}STB_CONCAT(CUR_TYPEINFO_NAME, _SymbolKind); \
+STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)); \
+typedef struct { \
+    char *name; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) typeinfo; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _SymbolKind) kind; \
+    union {; \
+        struct { \
+            int offset; \
+        }variable; \
+        struct { \
+            STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo) *args; \
+        }function; \
+        struct { \
+            struct STB_CONCAT(CUR_PARSER_NAME, _AST) *structdef; \
+        }struct1; \
+    }data; \
+}STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol);\
+STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)); \
+typedef struct STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL); \
+STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL)); \
+typedef struct { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) parent; \
+    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL) children; \
+    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbols; \
+    char *name; \
+}STB_CONCAT(CUR_TYPEINFO_NAME, _Scope);
 // ^ some typeinfo stuff for the user
+
+#define STB_LANG_TYPEINFO(...) (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)){__VA_ARGS__}
 
 #define STB_LANG_AST_LITERAL(typ, token) \
 ({ \

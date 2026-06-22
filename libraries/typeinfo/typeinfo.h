@@ -22,38 +22,69 @@
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 3)
 
-#define STB_LANG_ADD_VARIABLE(typeinf, scp, ...) do {if(typeinf.type != -1) { \
-    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = __VA_ARGS__; \
-    symbol.data.variable.offset = checker->entry_offset; \
-    checker->entry_offset += STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(symbol.typeinfo); \
-    STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(scp, symbol);} \
-}while(0);
 
-#define STB_LANG_ADD_FUNCTION(nam, ...) do { \
-    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) function = (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) {.name=nam, .kind = STB_LANG_SYMBOL_FUNCTION}; \
-    function.data.function.args = malloc(sizeof(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo))); \
-    *function.data.function.args = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo), _new)(); \
+
+#define STB_LANG_ADD_SYMBOL(nam, kin, ...) do { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) function = (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) {.name=nam, .kind = kin}; \
     __VA_ARGS__; \
     STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)checker->root_scope)->symbols), function); \
 }while(0);
 
+#define STB_LANG_ADD_VARIABLE(typeinf, scp, ...) do {if(typeinf.type != -1) { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symnew = __VA_ARGS__; \
+    symnew.data.variable.offset = checker->entry_offset; \
+    checker->entry_offset += STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(symnew.typeinfo, checker->root_scope); \
+    STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(scp, symnew);} \
+}while(0);
 
-#define STB_LANG_FIND_FUNCTION(nam, ...) do { \
-STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) *funcs = &(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)checker->root_scope)->symbols); \
+#define STB_LANG_ADD_FUNCTION(nam, ...) do { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symnew = (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) {.name=nam, .kind = STB_LANG_SYMBOL_FUNCTION}; \
+    symnew.data.function.args = malloc(sizeof(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo))); \
+    *symnew.data.function.args = STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo), _new)(); \
+    __VA_ARGS__; \
+    STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)checker->root_scope)->symbols), symnew); \
+}while(0);
+
+#define STB_LANG_ADD_DATA(nam, ...) do { \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symnew = (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) {.name=nam, .kind = STB_LANG_SYMBOL_DATA}; \
+    symnew.data.struct1.structdef = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast; \
+    __VA_ARGS__; \
+    STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol), _add)(&(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)checker->root_scope)->symbols), symnew); \
+}while(0);
+
+#define STB_LANG_CURRENT_SYMBOL() (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) symnew
+
+#define STB_LANG_SET_SYMBOL(left, right) \
+{ \
+    left = malloc(sizeof(right)); \
+    *((STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)*)left) = right; \
+}
+
+#define STB_LANG_GET_SCOPE(...) ((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)__VA_ARGS__)
+
+
+#define STB_LANG_FIND_SYMBOL(sym, nam, typ, root_scope, ...) do { \
+STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) *funcs = &(((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)root_scope)->symbols); \
 int found = 0; \
 for (int i=0; i<funcs->datalen; i++){ \
-    if (funcs->data[i].kind == STB_LANG_SYMBOL_FUNCTION){ \
+    if (funcs->data[i].kind == typ){ \
         if (strcmp(funcs->data[i].name, nam) == 0){ \
             found = 1; \
-            STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) function = funcs->data[i]; \
+            STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symnew = funcs->data[i]; \
             __VA_ARGS__; \
         }; \
     } \
 } \
 if (found == 0){ \
-    stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Function \"%s\" could not be found", nam); \
+    stb_lang_error_major_global(sym"Error", "%s \"%s\" could not be found", sym, nam); \
 } \
 }while(0);
+
+#define STB_LANG_FIND_FUNCTION(root_scope, nam, ...) \
+STB_LANG_FIND_SYMBOL("Function", nam, STB_LANG_SYMBOL_FUNCTION, root_scope, __VA_ARGS__);
+
+#define STB_LANG_FIND_DATA(root_scope, nam, ...) \
+STB_LANG_FIND_SYMBOL("DataStructure", nam, STB_LANG_SYMBOL_DATA, root_scope, __VA_ARGS__);
 
 #define STB_LANG_ITERATE_LINKED_LIST(start, head, type, ...) \
 type *head = (type*)start; \
@@ -65,10 +96,10 @@ while (head != NULL){ \
 
 
 #define STB_LANG_FUNCTION_ADD_PARAM(...) \
-STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo), _add)(function.data.function.args, (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo))__VA_ARGS__);
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo), _add)(symnew.data.function.args, (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo))__VA_ARGS__);
 
 #define STB_LANG_FUNCTION_RETURN(...) \
-function.typeinfo = (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo))__VA_ARGS__;
+symnew.typeinfo = (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo))__VA_ARGS__;
 
 #define STB_LANG_GET_AST(what) (STB_CONCAT(CUR_PARSER_NAME, _AST)*)what
 
@@ -91,7 +122,7 @@ for (int v=0; v<symbols->datalen; v++){ \
 }
 
 #define STB_LANG_FUNCTION_CHECK_LIST(params) \
-STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo) *typeinfos = function.data.function.args; \
+STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo) *typeinfos = symnew.data.function.args; \
 STB_CONCAT(CUR_PARSER_NAME, _AST) *param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)params; \
 for (int i=0; i<typeinfos->datalen; i++){ \
     if (typeinfos->data[i].type == STB_LANG_TYPEINFO_VARIADIC){ \
@@ -106,13 +137,13 @@ for (int i=0; i<typeinfos->datalen; i++){ \
         break; \
     } \
     if (param == NULL){ \
-        stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too few function arguments provided to function \"%s\"", function.name); \
+        stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too few function arguments provided to function \"%s\"", symnew.name); \
     } \
     STB_LANG_EXPECT_TYPEINFO_EQ(param->typeinfo, typeinfos->data[i], ast->offset); \
     param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)param->next; \
 } \
 if (param != NULL){ \
-    stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too many function arguments provided to function \"%s\"", function.name); \
+    stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too many function arguments provided to function \"%s\"", symnew.name); \
 } \
 escape: \
 
@@ -144,34 +175,6 @@ curscope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))__VA_ARGS__;
 
 
 #define STB_LANG_NEW_TYPEINFO(...) \
-typedef enum { \
-    STB_LANG_SYMBOL_VARIABLE, \
-    STB_LANG_SYMBOL_FUNCTION \
-}STB_CONCAT(CUR_TYPEINFO_NAME, _SymbolKind); \
-STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)); \
-typedef struct { \
-    char *name; \
-    STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) typeinfo; \
-    STB_CONCAT(CUR_TYPEINFO_NAME, _SymbolKind) kind; \
-    union {; \
-        struct { \
-            int offset; \
-        }variable; \
-        struct { \
-            STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Typeinfo) *args; \
-        }function; \
-    }data; \
-}STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol);\
-STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)); \
-struct STB_CONCAT(CUR_TYPEINFO_NAME, _Scope); \
-typedef struct STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL); \
-STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL)); \
-typedef struct { \
-    STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) parent; \
-    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL) children; \
-    STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _Symbol) symbols; \
-    char *name; \
-}STB_CONCAT(CUR_TYPEINFO_NAME, _Scope); \
 typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *head; \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *tail; \
@@ -298,10 +301,9 @@ STB_LANG_EXPAND_LIST(ast->right); \
     ast->typeinfo.ptrnum = typ.ptrnum; \
 }
 
-#define STB_LANG_TYPEINFO(...) (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)){.type=__VA_ARGS__, .ptrnum=0}
 
-#define STB_LANG_LHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left)
-#define STB_LANG_RHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->right)
+#define STB_LANG_LHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)(ast)->left)
+#define STB_LANG_RHS(ast) ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)(ast)->right)
 
 #define STB_LANG_EXPAND(thing) do{STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, thing);}while(0);
 
