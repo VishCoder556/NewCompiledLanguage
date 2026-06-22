@@ -131,7 +131,9 @@ char STB_CONCAT(CUR_IR_PREFIX, _translate)(CUR_IR_NAME *ir){ \
  \
     ir->tail = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ir->tail->next; \
     return 0; \
-} \
+}
 
+#define STB_LANG_IR_ERROR_MINOR(where, type, ...) \
+stb_lang_error_minor(ir->file.name, ir->file.contents, ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)where)->offset, type, __VA_ARGS__); \
 
 #endif

@@ -131,6 +131,7 @@ STB_LANG_BINDING_POWER(
 
 
     STB_LANG_MATCH_BINDING_POWER(TOKEN_LSB, 30)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_DOT, 30)
 ),
 STB_LANG_ASTS(
     AST_FUNCDEF,
@@ -166,7 +167,8 @@ STB_LANG_ASTS(
     AST_DEREF,
     AST_STORE,
     AST_INDEX,
-    AST_STRUCT
+    AST_STRUCT,
+    AST_ACCESS
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_IF_VALUE(TOKEN_ID, "struct",
@@ -289,7 +291,7 @@ STB_LANG_PARSE_AST(
             STB_LANG_IF_TOKEN(TOKEN_EQ,
                 STB_LANG_PARSER_ADVANCE();
                 STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser, 0));
-                if (lhs->type == AST_INDEX){
+                if (lhs->type == AST_INDEX || lhs->type == AST_ACCESS){
                     return STB_LANG_AST(.type=AST_STORE, .typeinfo=typeinfo, .value = NULL, .left=STB_LANG_AS_AST(lhs), .middle=NULL, .right=STB_LANG_AS_AST(assign));
                 }
                 return STB_LANG_AST(.type=AST_ASSIGN, .typeinfo=typeinfo, .value = NULL, .left=STB_LANG_AS_AST(lhs), .middle=NULL, .right=STB_LANG_AS_AST(assign));
@@ -386,6 +388,11 @@ skip:
             STB_LANG_GET_AST_EXPR(new, 10);
             parent->right = STB_LANG_AS_AST(new);
             STB_LANG_PARSER_EXPECT(TOKEN_RSB);
+        )
+        STB_LANG_TOKEN_MATCH_AST_CUSTOM(TOKEN_DOT, AST_ACCESS,
+            STB_LANG_PARSER_ADVANCE();
+            parent->value = token.value;
+            STB_LANG_PARSER_ADVANCE();
         )
     )
 ),
@@ -484,9 +491,11 @@ STB_LANG_NEW_TYPEINFO(
             size += STB_LANG_LOOKUP_SIZE(checker->root_scope, head);
         )
         ast->typeinfo.data.struct1.size = size;
+        ast->typeinfo.type = AST_TYPE_STRUCT;
         STB_LANG_ADD_DATA(ast->value, 
             // STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
-            // STB_LANG_SET_SYMBOL(ast->typeinfo.data.struct1.symbol, STB_LANG_CURRENT_SYMBOL());
+            symnew.data.struct1.structdef = STB_LANG_AS_AST(ast);
+            STB_LANG_SET_SYMBOL(ast->typeinfo.data.struct1.symbol, STB_LANG_CURRENT_SYMBOL());
         )
     )
     STB_LANG_TYPEINFO_CASE(AST_STORE, 
@@ -498,10 +507,21 @@ STB_LANG_NEW_TYPEINFO(
             ast->typeinfo.ptrnum--;
         }else if (ast->typeinfo.type == AST_TYPE_ARRAY){
             ast->typeinfo = *(Lang_TypeInfo_Typeinfo*)(ast->typeinfo.data.array.elem_type);
+        }else if (ast->typeinfo.type == AST_TYPE_STRUCT && STB_LANG_LHS(ast)->type == AST_ACCESS){
+            STB_LANG_FIND_DATA(checker->root_scope, STB_LANG_LHS(STB_LANG_LHS(ast))->typeinfo.data.struct1.name,
+                Lang_Parser_AST *structdef = STB_LANG_LHS(STB_LANG_GET_AST(symnew.data.struct1.structdef));
+                STB_LANG_ITERATE_LINKED_LIST(structdef, field, Lang_Parser_AST,
+                    if (field->type == AST_VAR){
+                        if (strcmp(field->value, STB_LANG_LHS(ast)->value) == 0){
+                            ast->typeinfo = field->typeinfo;
+                        }
+                    }
+                )
+            )
         }else {
             STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
         };
-        if (STB_LANG_LHS(ast)->type == AST_INDEX){
+        if (STB_LANG_LHS(ast)->type == AST_INDEX || STB_LANG_LHS(ast)->type == AST_ACCESS){
             // STB_LANG_EXPECT_TYPE_EQ(STB_LANG_LHS(ast), STB_LANG_RHS(ast));
         }else {
             STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
@@ -521,7 +541,7 @@ STB_LANG_NEW_TYPEINFO(
             STB_LANG_EXPAND_RHS();
             STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
         }
-        STB_LANG_INFER_TYPE(ast->value);
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
         STB_LANG_VARIABLE(ast);
     )
     STB_LANG_TYPEINFO_CASE(AST_VAR,
@@ -600,6 +620,15 @@ STB_LANG_NEW_TYPEINFO(
         }else {
             STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
         };
+    )
+    STB_LANG_TYPEINFO_CASE(AST_ACCESS,
+        STB_LANG_EXPAND_LHS();
+        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
+
+        STB_LANG_FIND_DATA(checker->root_scope, STB_LANG_LHS(ast)->typeinfo.data.struct1.name,
+            Lang_TypeInfo_Typeinfo *typeinfo = &(ast->typeinfo);
+            STB_LANG_SET_SYMBOL(typeinfo->data.struct1.symbol, symnew);
+        )
     )
     STB_LANG_TYPEINFO_CASE(AST_EXPR,
         STB_LANG_EXPAND_LHS();
@@ -688,10 +717,63 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
                 STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
                 STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, offset_reg));
                 STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_RHS(ast), NULL);
-                goto skip_store;
+            }else if (STB_LANG_LHS(ast)->type == AST_ACCESS) {
+                Lang_TypeInfo_Symbol *symbol = STB_LANG_GET_SYMBOL(STB_LANG_LHS(ast)->typeinfo.data.struct1.symbol);
+                Lang_Parser_AST *structdef = STB_LANG_GET_AST(symbol->data.struct1.structdef);
+                int offset = 0;
+                int found = 0;
+                STB_LANG_ITERATE_LINKED_LIST(STB_LANG_LHS(structdef), field, Lang_Parser_AST,
+                    if (field->type == AST_VAR){
+                        if (strcmp(field->value, STB_LANG_LHS(ast)->value) == 0){
+                            ast->typeinfo = field->typeinfo;
+                            found = 1;
+                            break;
+                        }else {
+                            offset += STB_LANG_LOOKUP_SIZE(ir->root_scope, field);
+                        }
+                    }
+                )
+
+                if (found == 0){
+                    STB_LANG_IR_ERROR_MINOR(ast, "StructError", "Could not find field \"%s\" in \"struct %s\"", STB_LANG_LHS(ast)->value, symbol->name);
+                }
+                STB_LANG_IR_NEW_TEMP(addr_reg);
+                STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
+                char str[32]; snprintf(str, 32, "%d", offset);
+                STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
+                STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_RHS(ast), NULL);
+            }else {
+                STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), NULL);
             }
-            STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), NULL);
-skip_store:
+        )
+
+        STB_LANG_IR_CASE(AST_ACCESS,
+            STB_LANG_IR_LHS(ast);
+            Lang_TypeInfo_Symbol *symbol = STB_LANG_GET_SYMBOL(ast->typeinfo.data.struct1.symbol);
+            Lang_Parser_AST *structdef = STB_LANG_GET_AST(symbol->data.struct1.structdef);
+            int offset = 0;
+            int found = 0;
+            STB_LANG_ITERATE_LINKED_LIST(STB_LANG_LHS(structdef), field, Lang_Parser_AST,
+                if (field->type == AST_VAR){
+                    if (strcmp(field->value, ast->value) == 0){
+                        ast->typeinfo = field->typeinfo;
+                        found = 1;
+                        break;
+                    }else {
+                        offset += STB_LANG_LOOKUP_SIZE(ir->root_scope, field);
+                    }
+                }
+            )
+            if (found == 0){
+                STB_LANG_IR_ERROR_MINOR(ast, "StructError", "Could not find field \"%s\" in \"struct %s\"", ast->value, symbol->name);
+            }
+            STB_LANG_IR_NEW_TEMP(addr_reg);
+            STB_LANG_IR_NEW_TEMP(dest_reg);
+            STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(ast), NULL);
+            char str[32]; snprintf(str, 32, "%d", offset);
+            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
+            STB_LANG_IR_EMIT(IR_LOAD, STB_LANG_IR_OPERAND(IR_REG, dest_reg), STB_LANG_IR_OPERAND(IR_REG, addr_reg), NULL);
+            return STB_LANG_IR_OPERAND(IR_REG, dest_reg);
         )
 
         STB_LANG_IR_CASE(AST_VAR,
@@ -1299,6 +1381,7 @@ int main(int argc, char **argv){
     Lang_TypeInfo *checker = lang_typeinfo_init(parser);
     while (lang_typeinfo_check(checker) == 0){
     }
+
 
 
     Lang_IR *ir = lang_ir_init(checker);

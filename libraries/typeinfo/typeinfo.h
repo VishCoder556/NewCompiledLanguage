@@ -54,6 +54,9 @@
 
 #define STB_LANG_CURRENT_SYMBOL() (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)) symnew
 
+#define STB_LANG_GET_SYMBOL(...) \
+((STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)*)__VA_ARGS__)
+
 #define STB_LANG_SET_SYMBOL(left, right) \
 { \
     left = malloc(sizeof(right)); \
@@ -166,6 +169,7 @@ STB_LANG_REGISTER_VARIABLE(ast->value, ast->typeinfo)
 
 #define STB_LANG_INFER_TYPE(nam) \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(checker->current_scope), nam); \
+if (symbol.typeinfo.type == -1) {symbol = STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_find)((STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)*)(checker->root_scope), nam);} \
 if (symbol.typeinfo.type != -1) {ast->typeinfo = symbol.typeinfo;}
 
 #define STB_LANG_SCOPE_MAKE_CHILD(paren, curscope, ...) \
@@ -315,8 +319,8 @@ STB_LANG_EXPAND_LIST(ast->right); \
 stb_lang_error_minor(checker->file.name, checker->file.contents, offset, "TypeinfoError", "Expected types to be equal"); \
 }
 
-#define STB_LANG_TYPEINFO_ERROR_MINOR(where, type, nam) \
-stb_lang_error_minor(checker->file.name, checker->file.contents, ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)where)->offset, type, nam); \
+#define STB_LANG_TYPEINFO_ERROR_MINOR(where, type, ...) \
+stb_lang_error_minor(checker->file.name, checker->file.contents, ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)where)->offset, type, __VA_ARGS__); \
 
 
 #define STB_LANG_EXPECT_TYPE_EQ(left, right) if (left != NULL && right != NULL){ \
