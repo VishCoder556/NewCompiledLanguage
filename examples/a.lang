@@ -8,8 +8,7 @@ struct Hello {
 }
 
 int main(int argc, ptr<string> argv){
-    struct Hello hello;
-    hello.a = 5
-    hello.b = 10
-    return hello.a + hello.b;
+    ptr<struct Hello> h = cast(ptr<struct Hello>, malloc(16));
+    deref(h).b = 5
+    return deref(h + cast(ptr<struct Hello>, 8));
 }

@@ -262,24 +262,12 @@ STB_LANG_PARSE_AST(
         STB_LANG_OPERAND(expr, lang_parser_parse_expr(parser, 0));
         return STB_LANG_AST(.type=AST_RET, .value=NULL, .left=STB_LANG_AS_AST(expr), .middle=NULL, .right=NULL);
     )
-    STB_LANG_IF_VALUE(TOKEN_ID, "deref", 
-        // Yes, it's hardcoded as AST_STORE, this can be fixed soon, but it's easiest to implement for now
-        STB_LANG_PARSER_ADVANCE()
-        STB_LANG_PARSER_EXPECT(TOKEN_LP);
-        STB_LANG_GET_AST_EXPR(exp, 0);
-        STB_LANG_PARSER_EXPECT(TOKEN_RP);
-        STB_LANG_IF_TOKEN(TOKEN_EQ,
-            STB_LANG_PARSER_ADVANCE();
-            STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser, 0));
-            return STB_LANG_AST(.type=AST_STORE, .typeinfo=-1, .value=NULL, .left=STB_LANG_AS_AST(exp), .middle=NULL, .right=STB_LANG_AS_AST(assign));
-        ) STB_LANG_ELSE(
-            return STB_LANG_AST(.type = AST_DEREF, .left = STB_LANG_AS_AST(exp), .right=NULL, .middle=NULL);
-        )
-    )
     STB_LANG_GET_TYPEINFO(typeinfo){
         goto assign_decl_end;
     maybe_assign:
-        ;
+        if (token.value != NULL){
+            if (strcmp(token.value, "deref") == 0){goto not_funcall;}
+        }
         STB_LANG_SAVE(varia, token)
         STB_LANG_PARSER_ADVANCE()
         STB_LANG_IF_TOKEN(TOKEN_LP,
@@ -287,12 +275,16 @@ STB_LANG_PARSE_AST(
             return STB_LANG_AST_FUNCALL(AST_FUNCALL, varia, args)
         ) STB_LANG_ELSE (
             STB_LANG_PARSER_BACK();
+not_funcall:
+            ;
             STB_LANG_GET_AST_EXPR(lhs, 0);
             STB_LANG_IF_TOKEN(TOKEN_EQ,
                 STB_LANG_PARSER_ADVANCE();
                 STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser, 0));
                 if (lhs->type == AST_INDEX || lhs->type == AST_ACCESS){
                     return STB_LANG_AST(.type=AST_STORE, .typeinfo=typeinfo, .value = NULL, .left=STB_LANG_AS_AST(lhs), .middle=NULL, .right=STB_LANG_AS_AST(assign));
+                }else if (lhs->type == AST_DEREF){
+                    return STB_LANG_AST(.type=AST_STORE, .typeinfo=typeinfo, .value = NULL, .left=STB_LANG_AS_AST(STB_LANG_LHS(lhs)), .middle=NULL, .right=STB_LANG_AS_AST(assign));
                 }
                 return STB_LANG_AST(.type=AST_ASSIGN, .typeinfo=typeinfo, .value = NULL, .left=STB_LANG_AS_AST(lhs), .middle=NULL, .right=STB_LANG_AS_AST(assign));
             )
@@ -518,6 +510,8 @@ STB_LANG_NEW_TYPEINFO(
                     }
                 )
             )
+        }else if (STB_LANG_LHS(ast)->type == AST_DEREF){
+            // Deref already did the typeinfo--
         }else {
             STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
         };
