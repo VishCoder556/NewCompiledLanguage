@@ -111,12 +111,19 @@ if (c == s[0]){ \
     }; \
 }
 #define STB_LANG_TOKEN_COMMENT_LINE(str) \
+int _cur = tokenizer->cursor; \
 if (c == str[0]){ \
     int lim = strlen(str); \
+    STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer); \
+    c = tokenizer->file.contents[tokenizer->cursor]; \
     for (int i=1; i<lim; i++){ \
-        if (c == str[i-1]){ \
+        if (c == str[i]){ \
             STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer); \
             c = tokenizer->file.contents[tokenizer->cursor]; \
+        }else { \
+            tokenizer->cursor = _cur; \
+            c = tokenizer->file.contents[tokenizer->cursor]; \
+            goto no_comment; \
         }; \
     } \
     c = tokenizer->file.contents[tokenizer->cursor]; \
@@ -125,6 +132,7 @@ if (c == str[0]){ \
         c = tokenizer->file.contents[tokenizer->cursor]; \
     } \
 } \
+no_comment:;
 
 
 #define STB_LANG_SKIP(ch) if (c==ch){goto skip;}
