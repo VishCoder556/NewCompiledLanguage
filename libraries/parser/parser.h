@@ -32,6 +32,8 @@
 #define STB_LANG_PARSER_UPDATE() token = parser->tokens.data[parser->cursor];
 #define STB_LANG_PARSER_ADVANCE(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _advance)(parser) == -1){stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
 
+#define STB_LANG_PARSER_BACK(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _back)(parser) == -1){stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "OutOfBoundsError", "Went out of bounds to back up");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
+
 
 #define STB_LANG_MATCH_TOKEN(typ, ...) else if (token.type == typ) {match_token = token; STB_LANG_PARSER_ADVANCE();__VA_ARGS__;}
 #define STB_LANG_MATCH_VALUE(typ, val, ...) else if(token.type == typ) \
@@ -160,6 +162,13 @@ char STB_CONCAT(CUR_PARSER_PREFIX, _advance)(CUR_PARSER_NAME *parser) { \
         return -1; \
     } \
     parser->cursor++; \
+    return 0;\
+} \
+char STB_CONCAT(CUR_PARSER_PREFIX, _back)(CUR_PARSER_NAME *parser) { \
+    if (parser->cursor <= 0){ \
+        return -1; \
+    } \
+    parser->cursor--; \
     return 0;\
 } \
 STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) STB_CONCAT(CUR_PARSER_PREFIX, _parse_typeinfo)(CUR_PARSER_NAME *parser) { \

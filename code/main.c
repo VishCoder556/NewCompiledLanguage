@@ -250,21 +250,34 @@ STB_LANG_PARSE_AST(
         )
     )
     STB_LANG_GET_TYPEINFO(typeinfo){
+        goto assign_decl_end;
     maybe_assign:
+        ;
+        STB_LANG_SAVE(varia, token)
+        STB_LANG_PARSER_ADVANCE()
+        STB_LANG_IF_TOKEN(TOKEN_LP,
+            STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
+            return STB_LANG_AST_FUNCALL(AST_FUNCALL, varia, args)
+        ) STB_LANG_ELSE (
+            STB_LANG_PARSER_BACK();
+            STB_LANG_GET_AST_EXPR(lhs, 0);
+            STB_LANG_IF_TOKEN(TOKEN_EQ,
+                STB_LANG_PARSER_ADVANCE();
+                STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser, 0));
+                if (lhs->type == AST_INDEX){
+                    return STB_LANG_AST(.type=AST_STORE, .typeinfo=typeinfo, .value = NULL, .left=STB_LANG_AS_AST(lhs), .middle=NULL, .right=STB_LANG_AS_AST(assign));
+                }
+                return STB_LANG_AST(.type=AST_ASSIGN, .typeinfo=typeinfo, .value = NULL, .left=STB_LANG_AS_AST(lhs), .middle=NULL, .right=STB_LANG_AS_AST(assign));
+            )
+        );
+    assign_decl_end:
         STB_LANG_IF_TOKEN(TOKEN_ID, 
             STB_LANG_PARSER_ADVANCE()
             STB_LANG_SAVE(varia, match_token)
             STB_LANG_IF_TOKEN(TOKEN_EQ,
                 STB_LANG_PARSER_ADVANCE();
                 STB_LANG_OPERAND(assign, lang_parser_parse_expr(parser, 0));
-                int type = AST_DECL;
-                if (typeinfo.type == -1) {
-                    type = AST_ASSIGN;
-                }
-                return STB_LANG_AST(.type=type, .typeinfo=typeinfo, .value = varia.value, .left=NULL, .middle=NULL, .right=STB_LANG_AS_AST(assign));
-            ) STB_LANG_ELSE_IF_TOKEN(TOKEN_LP,
-                STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
-                return STB_LANG_AST_FUNCALL(AST_FUNCALL, varia, args)
+                return STB_LANG_AST(.type=AST_DECL, .typeinfo=typeinfo, .value = varia.value, .left=NULL, .middle=NULL, .right=STB_LANG_AS_AST(assign));
             ) STB_LANG_ELSE(
                 if (typeinfo.type != -1){
                     return STB_LANG_AST(.type=AST_DECL, .typeinfo=typeinfo, .value = varia.value, .left=NULL, .middle=NULL, .right=NULL);
@@ -432,13 +445,20 @@ STB_LANG_NEW_TYPEINFO(
         }else {
             STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
         };
-        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        if (STB_LANG_LHS(ast)->type == AST_INDEX){
+            // STB_LANG_EXPECT_TYPE_EQ(STB_LANG_LHS(ast), STB_LANG_RHS(ast));
+        }else {
+            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        }
     )
     STB_LANG_TYPEINFO_CASE(AST_ASSIGN, 
+        STB_LANG_EXPAND_LHS();
         STB_LANG_EXPAND_RHS();
-        STB_LANG_INFER_TYPE(ast->value);
+        if (STB_LANG_OF_AST(ast->left, type) == AST_VAR){
+            STB_LANG_INFER_TYPE(STB_LANG_OF_AST(ast->left, value));
+            STB_LANG_REGISTER_VARIABLE(STB_LANG_OF_AST(ast->left, value), ast->typeinfo)
+        }
         STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-        STB_LANG_VARIABLE(ast);
     )
     STB_LANG_TYPEINFO_CASE(AST_DECL,
         if (STB_LANG_RHS(ast) != NULL){
@@ -593,11 +613,24 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
             STB_LANG_IR_EMIT(IR_FUNCDEF_END, STB_LANG_IR_OPERAND(IR_VAR, ast->value), NULL, NULL);
         )
         STB_LANG_IR_CASE(AST_ASSIGN,
-            STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND(IR_VAR, ast->value), STB_LANG_IR_RHS(), NULL);
+            STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), NULL);
         )
 
         STB_LANG_IR_CASE(AST_STORE,
-            STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_LHS(), STB_LANG_IR_RHS(), NULL);
+            if (STB_LANG_LHS(ast)->type == AST_INDEX){
+                STB_LANG_IR_NEW_TEMP(addr_reg);
+                STB_LANG_IR_NEW_TEMP(offset_reg);
+
+                char str[32]; snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(&STB_LANG_LHS(ast)->typeinfo));
+                // a[0] = 5
+                STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND(IR_REG, offset_reg), STB_LANG_IR_RHS(STB_LANG_LHS(ast)), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
+                STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
+                STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, offset_reg));
+                STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_RHS(ast), NULL);
+                goto skip_store;
+            }
+            STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), NULL);
+skip_store:
         )
 
         STB_LANG_IR_CASE(AST_VAR,
@@ -609,7 +642,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         )
         STB_LANG_IR_CASE(AST_DECL,
             if (STB_LANG_RHS(ast) != NULL) {
-                STB_LANG_IR_EMIT(IR_DECL, STB_LANG_IR_OPERAND(IR_VAR, ast->value), STB_LANG_IR_RHS(), NULL);
+                STB_LANG_IR_EMIT(IR_DECL, STB_LANG_IR_OPERAND(IR_VAR, ast->value), STB_LANG_IR_RHS(ast), NULL);
             }
         )
         STB_LANG_IR_CASE(AST_INT,
@@ -649,89 +682,89 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         )
         STB_LANG_IR_CASE(AST_ADD,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_SUB,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_SUB, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_SUB, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_MUL,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_DIV,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_DIV, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_DIV, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_MODULO,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_MOD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_MOD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_BOR,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_BOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_BOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_BAND,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_BAND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_BAND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_AND,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_AND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_AND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_OR,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_OR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_OR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_XOR,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_XOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_XOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_LT,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_LT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_LT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_LTE,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_LTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_LTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_GT,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_GT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_GT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_GTE,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_GTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_GTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_EQ,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_EQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_EQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_NEQ,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_NEQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(), STB_LANG_IR_RHS());
+            STB_LANG_IR_EMIT(IR_NEQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_IF,
             STB_LANG_IR_NEW_LABEL(label)
             STB_LANG_IR_NEW_LABEL(end)
 
-            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS(ast);
             char *temp = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
             STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND(IR_REG, temp), operand, NULL);
 
@@ -743,7 +776,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
             STB_LANG_IR_EMIT(IR_LABEL, STB_LANG_IR_LABEL(IR_VAR, end), operand, NULL);
         )
         STB_LANG_IR_CASE(AST_RET,
-            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS(ast);
             STB_LANG_IR_EMIT(IR_RET, NULL, operand, NULL);
         )
         STB_LANG_IR_CASE(AST_CAST,
@@ -754,13 +787,13 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         )
         STB_LANG_IR_CASE(AST_REF,
             STB_LANG_IR_NEW_TEMP(dest);
-            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS(ast);
             STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_AS_TEMP(IR_REG, dest), operand, NULL);
             return STB_LANG_IR_AS_TEMP(IR_REG, dest);
         )
         STB_LANG_IR_CASE(AST_DEREF,
             STB_LANG_IR_NEW_TEMP(dest);
-            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS(ast);
             STB_LANG_IR_EMIT(IR_LOAD, STB_LANG_IR_AS_TEMP(IR_REG, dest), operand, NULL);
             return STB_LANG_IR_AS_TEMP(IR_REG, dest);
         )
@@ -768,10 +801,9 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
             STB_LANG_IR_NEW_TEMP(dest);
             STB_LANG_IR_NEW_TEMP(temp_reg);
             STB_LANG_IR_NEW_TEMP(temp2);
-            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
             char str[32]; snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(&ast->typeinfo));
-            STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND(IR_REG, temp_reg), STB_LANG_IR_RHS(), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
-            STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, temp2), operand, NULL);
+            STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND(IR_REG, temp_reg), STB_LANG_IR_RHS(ast), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
+            STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_LHS(ast), NULL);
             STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_OPERAND(IR_REG, temp_reg));
             STB_LANG_IR_EMIT(IR_LOAD, STB_LANG_IR_AS_TEMP(IR_REG, dest), STB_LANG_IR_OPERAND(IR_REG, temp2), NULL);
             return STB_LANG_IR_AS_TEMP(IR_REG, dest);
@@ -782,7 +814,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
 
             STB_LANG_IR_NEW_LABEL(label1)
 
-            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS();
+            STB_CONCAT(CUR_IR_NAME, _Operand) *operand = STB_LANG_IR_LHS(ast);
             char *temp = STB_CONCAT(CUR_IR_PREFIX, _make_temp_reg_string)(ir);
             STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND(IR_REG, temp), operand, NULL);
             STB_LANG_IR_EMIT(IR_JUMP_IF_FALSE, STB_LANG_IR_LABEL(IR_VAR, label1), operand, STB_LANG_IR_OPERAND(IR_REG, temp));
