@@ -127,7 +127,8 @@ STB_LANG_ADD_VARIABLE(typeinf, \
 
 
 
-#define STB_LANG_VARIABLE(ast) STB_LANG_REGISTER_VARIABLE(ast->value, ast->typeinfo)
+#define STB_LANG_VARIABLE(ast) \
+STB_LANG_REGISTER_VARIABLE(ast->value, ast->typeinfo)
 
 
 
@@ -262,7 +263,9 @@ char STB_CONCAT(CUR_TYPEINFO_PREFIX, _check)(CUR_TYPEINFO_NAME *checker) { \
 #define STB_LANG_EXPAND_PARAMS() do {\
 STB_CONCAT(CUR_PARSER_NAME, _AST) *_params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)ast->left; \
 while (_params != NULL){ \
-    STB_LANG_VARIABLE(_params); \
+    if (_params->typeinfo.type != STB_LANG_TYPEINFO_VARIADIC){ \
+        STB_LANG_VARIABLE(_params); \
+    } \
     _params = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_params->next; \
 }}while(0);
 
@@ -303,7 +306,7 @@ STB_LANG_EXPAND_LIST(ast->right); \
 #define STB_LANG_EXPAND(thing) do{STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, thing);}while(0);
 
 
-#define STB_LANG_EXPAND_RHS() do{ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_RHS(ast));}while(0);
+#define STB_LANG_EXPAND_RHS() do{ if (STB_LANG_RHS(ast) != NULL){ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_RHS(ast));}}while(0);
 #define STB_LANG_EXPAND_LHS() do{ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_LHS(ast));}while(0);
 
 #define STB_LANG_EXPECT_TYPEINFO_EQ(left, right, offset) if (left.type != right.type || left.ptrnum != right.ptrnum){ \

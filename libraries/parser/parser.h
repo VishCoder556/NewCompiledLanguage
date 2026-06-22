@@ -66,6 +66,30 @@ if (token.type != typ){ \
 
 #define STB_LANG_TOKEN_MATCH_AST(tok, ast) else if (op_token.type == tok){ \
     parent->type = ast; \
+    STB_LANG_PARSER_ADVANCE(); \
+    STB_CONCAT(CUR_PARSER_NAME, _AST) *right = STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(parser, next_bp); \
+ \
+    parent->typeinfo = (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)){.type = -1}; \
+    parent->value = op_token.value; \
+    parent->left = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)left; \
+    parent->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)right; \
+    parent->next = NULL; \
+    parent->offset = offset; \
+ \
+    left = parent; \
+}
+
+
+#define STB_LANG_TOKEN_MATCH_AST_CUSTOM(tok, ast, ...) else if (op_token.type == tok){ \
+    parent->type = ast; \
+    parent->typeinfo = (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)){.type = -1}; \
+    parent->value = op_token.value; \
+    parent->left = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)left; \
+    parent->next = NULL; \
+    parent->offset = offset; \
+    __VA_ARGS__; \
+ \
+    left = parent; \
 }
 
 
@@ -81,18 +105,7 @@ while (parser->cursor < parser->tokens.datalen) { \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) op_token = next_tok; \
     if (0){}__VA_ARGS__ else {break;}; \
 \
-    STB_LANG_PARSER_ADVANCE(); \
  \
-    STB_CONCAT(CUR_PARSER_NAME, _AST) *right = STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(parser, next_bp); \
- \
-    parent->typeinfo = (STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)){.type = -1}; \
-    parent->value = op_token.value; \
-    parent->left = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)left; \
-    parent->right = (struct STB_CONCAT(CUR_PARSER_NAME, _AST)*)right; \
-    parent->next = NULL; \
-    parent->offset = offset; \
- \
-    left = parent; \
 } \
  \
 return left;
@@ -218,6 +231,12 @@ int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(STB_CONCAT(CUR_TYP
     return -1; \
 }
 
+#define STB_LANG_LOOKUP_SIZE(typeinf) STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(*(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)*)typeinf)
+
+
+#define STB_LANG_PARSER_ERROR_MINOR(where, type, nam) \
+stb_lang_error_minor(parser->file.name, parser->file.contents, ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)where)->offset, type, nam); \
+
 
 #define STB_LANG_DEFINE_TYPEINFO(...) \
 typedef enum { \
@@ -228,6 +247,12 @@ typedef enum { \
 typedef struct { \
     STB_CONCAT(CUR_TYPEINFO_NAME, _TypeinfoType) type; \
     int ptrnum; \
+    union { \
+        struct { \
+            int size; \
+            struct AST_TypeInfo *elem_type; \
+        } array; \
+    } data; \
 }STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo);
 // ^ some typeinfo stuff for the user
 
@@ -310,6 +335,7 @@ STB_LANG_PARSE_CUSTOM_LIST(starttok, splitA, endtok,  \
 #define STB_LANG_GET_TYPEINFO(name) \
 TypeInfo = STB_CONCAT(CUR_PARSER_PREFIX, _parse_typeinfo)(parser); \
 STB_LANG_SAVE(name, TypeInfo); \
+STB_LANG_PARSER_UPDATE(); \
 if (name.type != -1)
 
 
