@@ -1,0 +1,10 @@
+void printf(string fmt, ...)
+
+int main(int argc, ptr<string> argv){
+    int i = 0;
+    while (i < argc){
+        printf("Argument #%d: %s\n", i, argv[i])
+        i = i + 1
+    }
+    return 0;
+}

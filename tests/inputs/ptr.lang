@@ -1,0 +1,11 @@
+ptr<int> malloc(int size);
+void exit(int return);
+void printf(string fmt, ...)
+
+int main(int argc, int argv){
+    int i = 5;
+    ptr<int> a = ref(i)
+    deref(a) = 10
+    printf("%d\n", i)
+    return 0
+}

@@ -1,0 +1,5 @@
+void printf(string fmt, ...)
+
+int main(int argc, int argv){
+    printf("Argument Count = %d!\n", argc);
+}

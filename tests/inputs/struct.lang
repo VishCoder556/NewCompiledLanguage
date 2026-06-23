@@ -1,0 +1,16 @@
+ptr<int> malloc(int size);
+void exit(int return);
+void printf(string fmt, ...)
+
+struct Hello {
+    int a
+    int b
+}
+
+int main(int argc, ptr<string> argv){
+    struct Hello hello;
+    hello.a = 5
+    hello.b = 10
+    printf("Sum: %d\n", hello.a + hello.b)
+    return 0
+}
