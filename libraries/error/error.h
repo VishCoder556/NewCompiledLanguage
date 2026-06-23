@@ -92,6 +92,7 @@ void stb_lang_error_minor(char *file, char *contents, int offset, char *type, ch
         newrow /= 10;
     } while (newrow != 0);
 
+    row++;
     // printf("\x1b[1;37m%s:%d:%d: \x1b[1;31m%s\x1b[0m: %s\n%s\n", file, row, col, type, add, line);
     printf("\x1b[1;37m%s:%d:%d: \x1b[1;31m%s\x1b[0m: %s\n%d |  %s\n", file, row, col, type, add, row, line);
     for (int i=0; i<count+1; i++){printf(" ");}

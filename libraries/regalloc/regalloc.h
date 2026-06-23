@@ -244,7 +244,7 @@ if (instr->operand->isLast == 1){ \
 
 
 #define STB_LANG_ARM_REG_MAP(num) \
-    STB_LANG_REGALLOC_REGISTER_MATCH(REG_X##num, "x"#num, "w"#num, NULL, NULL)
+    STB_LANG_REGALLOC_REGISTER_MATCH(REG_X##num, "x"#num, "w"#num, "w"#num, "w"#num)
 
 #define STB_LANG_REGALLOC_RHS() \
 STB_CONCAT(CUR_REGALLOC_PREFIX, _ir)(regalloc, instr->left);

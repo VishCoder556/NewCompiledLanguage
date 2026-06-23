@@ -10,8 +10,8 @@
 #undef STB_LANG_INVOKE_TYPENEW
 #define STB_LANG_INVOKE_TYPENEW(a) dymarray_typenew(a, 10, 5)
 
-#define STB_LANG_IR_EMIT(typ, des, lef, righ) \
-STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .left=lef, .right=righ, .dest=des, .offset=offset, .phys={-1}})
+#define STB_LANG_IR_EMIT(typ, des, lef, righ, ...) \
+STB_CONCAT(STB_CONCAT3(dymarray_, CUR_IR_NAME, _Instr), _add)(&ir->instrs, (STB_CONCAT(CUR_IR_NAME, _Instr)){.type=typ, .left=lef, .right=righ, .dest=des, .offset=offset, .phys={-1}, __VA_ARGS__})
 
 
 #define STB_LANG_IR_RUN(place) do {\
@@ -74,6 +74,7 @@ typedef struct { \
     STB_CONCAT(CUR_IR_NAME, _Operand) *dest; \
     int offset; \
     int phys[4]; \
+    STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) typeinfo; \
 }STB_CONCAT(CUR_IR_NAME, _Instr); \
 typedef struct { \
     char *data; \
