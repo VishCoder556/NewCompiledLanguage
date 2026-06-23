@@ -12,6 +12,13 @@
 #define STB_CONCAT3(a, b, c) STB_CONCAT3_EVAL(a, b, c)
 
 
+#define STB_LANG_TYPEINFO_ERROR_MINOR(where, fil, type, ...) \
+if (fil > checker->files.datalen){ \
+    stb_lang_error_minor(checker->file.name, checker->file.contents, where, "TypeinfoError", "Failure to generate error"); \
+} \
+stb_lang_error_minor(checker->files.data[fil].name, checker->files.data[fil].contents, where, type, __VA_ARGS__);
+
+
 #define STB_LANG_TYPEINFO_CASE(typ, ...) else if(ast->type == typ){__VA_ARGS__;}
 #define STB_LANG_TYPEINFO_2CASES(typ, typ2, ...) else if(ast->type == typ || ast->type == typ2){__VA_ARGS__;}
 #define STB_LANG_TYPEINFO_3CASES(typ, typ2, typ3, ...) else if(ast->type == typ || ast->type == typ2 || ast->type == typ3){__VA_ARGS__;}
@@ -140,13 +147,13 @@ for (int i=0; i<typeinfos->datalen; i++){ \
         break; \
     } \
     if (param == NULL){ \
-        stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too few function arguments provided to function \"%s\"", symnew.name); \
+        STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "FunctionError", "Too few function arguments provided to function \"%s\"", symnew.name); \
     } \
-    STB_LANG_EXPECT_TYPEINFO_EQ(param->typeinfo, typeinfos->data[i], ast->offset); \
+    STB_LANG_EXPECT_TYPEINFO_EQ(param->typeinfo, typeinfos->data[i], ast->offset, ast->file); \
     param = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)param->next; \
 } \
 if (param != NULL){ \
-    stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "FunctionError", "Too many function arguments provided to function \"%s\"", symnew.name); \
+    STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "FunctionError", "Too many function arguments provided to function \"%s\"", symnew.name); \
 } \
 escape: \
 
@@ -189,6 +196,7 @@ typedef struct { \
     \
     int entry_offset; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
+    STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _File) files; \
 }CUR_TYPEINFO_NAME; \
 STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) paren, char *name){ \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scope = malloc(sizeof(*scope)); \
@@ -249,6 +257,7 @@ CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parse
     typeinfo->current_scope = typeinfo->root_scope; \
     typeinfo->entry_offset = 0; \
     typeinfo->file = parser->file; \
+    typeinfo->files = parser->files; \
     return typeinfo; \
 } \
 int a = 0; \
@@ -257,7 +266,7 @@ void STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(CUR_TYPEINFO_NAME *checker, STB
         stb_lang_error_major_global("ParserError", "Found NULL AST"); \
     } \
     if (0){} __VA_ARGS__ else { \
-        stb_lang_error_minor(checker->file.name, checker->file.contents, ast->offset, "TypecheckerError", "Could not typecheck ast with type '%d'", ast->type); \
+        STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "TypecheckerError", "Could not typecheck ast with type '%d'", ast->type); \
     }; \
 } \
 char STB_CONCAT(CUR_TYPEINFO_PREFIX, _check)(CUR_TYPEINFO_NAME *checker) { \
@@ -282,7 +291,8 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *_block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)
 while (_block != NULL){ \
     STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, _block); \
     _block = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)_block->next; \
-}}while(0);
+} \
+}while(0); \
 
 #define STB_LANG_EXPAND_ARGS() do {\
 STB_LANG_EXPAND_LIST(ast->left); \
@@ -315,16 +325,13 @@ STB_LANG_EXPAND_LIST(ast->right); \
 #define STB_LANG_EXPAND_RHS() do{ if (STB_LANG_RHS(ast) != NULL){ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_RHS(ast));}}while(0);
 #define STB_LANG_EXPAND_LHS() do{ STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, STB_LANG_LHS(ast));}while(0);
 
-#define STB_LANG_EXPECT_TYPEINFO_EQ(left, right, offset) if (left.type != right.type || left.ptrnum != right.ptrnum){ \
-stb_lang_error_minor(checker->file.name, checker->file.contents, offset, "TypeinfoError", "Expected types to be equal"); \
+#define STB_LANG_EXPECT_TYPEINFO_EQ(left, right, offset, file)  \
+if (left.type != right.type || left.ptrnum != right.ptrnum){ \
+    STB_LANG_TYPEINFO_ERROR_MINOR(offset, file, "TypeinfoError", "Expected types to be equal"); \
 }
 
-#define STB_LANG_TYPEINFO_ERROR_MINOR(where, type, ...) \
-stb_lang_error_minor(checker->file.name, checker->file.contents, ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)where)->offset, type, __VA_ARGS__); \
-
-
 #define STB_LANG_EXPECT_TYPE_EQ(left, right) if (left != NULL && right != NULL){ \
-    STB_LANG_EXPECT_TYPEINFO_EQ(left->typeinfo, right->typeinfo, left->offset) \
+    STB_LANG_EXPECT_TYPEINFO_EQ(left->typeinfo, right->typeinfo, left->offset, left->file) \
 }
 
 

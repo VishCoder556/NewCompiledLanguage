@@ -19,7 +19,15 @@
 #define STB_CONCAT(a, b) STB_CONCAT_EVAL(a, b)
 #define STB_CONCAT3(a, b, c) STB_CONCAT3_EVAL(a, b, c)
 
-#define STB_LANG_PARSER_ERROR_FALLOUT(where) stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ParserError", "Could not parse %s", where)
+
+#define STB_LANG_PARSER_ERROR_MINOR(where, fil, type, ...) \
+if (fil > parser->files.datalen){ \
+    stb_lang_error_minor(parser->file.name, parser->file.contents, where, "ParserError", "Failure to generate error"); \
+} \
+stb_lang_error_minor(parser->files.data[fil].name, parser->files.data[fil].contents, where, type, __VA_ARGS__);
+
+#define STB_LANG_PARSER_ERROR_FALLOUT(where) \
+STB_LANG_PARSER_ERROR_MINOR(old_token.offset, old_token.file, "ParserError", "Could not parse %s", where);
 
 #define STB_LANG_ASTS(...) __VA_ARGS__
 #define STB_LANG_PARSE_BODY(...) __VA_ARGS__; STB_LANG_PARSER_ERROR_FALLOUT("body statement");
@@ -30,9 +38,9 @@
 #define STB_LANG_MATCH_BINDING_POWER(t, v) case t: return v;
 
 #define STB_LANG_PARSER_UPDATE() token = parser->tokens.data[parser->cursor];
-#define STB_LANG_PARSER_ADVANCE(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _advance)(parser) == -1){stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
+#define STB_LANG_PARSER_ADVANCE(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _advance)(parser) == -1){STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
 
-#define STB_LANG_PARSER_BACK(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _back)(parser) == -1){stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "OutOfBoundsError", "Went out of bounds to back up");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
+#define STB_LANG_PARSER_BACK(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _back)(parser) == -1){STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "OutOfBoundsError", "Went out of bounds to back up");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
 
 
 #define STB_LANG_MATCH_TOKEN(typ, ...) else if (token.type == typ) {match_token = token; STB_LANG_PARSER_ADVANCE();__VA_ARGS__;}
@@ -57,13 +65,13 @@ break; \
 // STB_LANG_PARSER_EXPECT: yes, the error messages are bland and weird, this is a TODO for later
 #define STB_LANG_PARSER_EXPECT(typ) \
 if (token.type != typ){ \
-    stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ExpectError", "Expected token '%d', got '%d'", typ, token.type); \
+    STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "ExpectError", "Expected token '%d', got '%d'", typ, token.type); \
 }else {STB_LANG_PARSER_ADVANCE();}
 
 
 #define STB_LANG_PARSER_EXPECT_IN_PLACE(typ) \
 if (token.type != typ){ \
-    stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ExpectError", "Expected token '%d', got '%d'", typ, token.type); \
+    STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "ExpectError", "Expected token '%d', got '%d'", typ, token.type); \
 }
 
 #define STB_LANG_TOKEN_MATCH_AST(tok, ast) else if (op_token.type == tok){ \
@@ -131,6 +139,7 @@ typedef struct { \
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *right;\
     struct STB_CONCAT(CUR_PARSER_NAME, _AST) *next; \
     int offset; \
+    int file; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) typeinfo; \
 }STB_CONCAT(CUR_PARSER_NAME, _AST); \
 typedef struct { \
@@ -138,6 +147,7 @@ typedef struct { \
     LinkedList(STB_CONCAT(CUR_PARSER_NAME, _AST)); \
     int cursor; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
+    STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _File) files; \
 }CUR_PARSER_NAME; \
 typedef struct { \
     LinkedList(STB_CONCAT(CUR_PARSER_NAME, _AST)); \
@@ -149,12 +159,13 @@ int STB_CONCAT(CUR_PARSER_PREFIX, _binding_power)(STB_CONCAT(CUR_TOKENIZER_NAME,
     }; \
     return 0; \
 }; \
-CUR_PARSER_NAME *STB_CONCAT(CUR_PARSER_PREFIX, _init)(CUR_TOKENIZER_NAME *tokenizer) { \
+CUR_PARSER_NAME *STB_CONCAT(CUR_PARSER_PREFIX, _init)(CUR_PREPROCESSOR_NAME *processor) { \
     CUR_PARSER_NAME *parser = malloc(sizeof(*parser)); \
     parser->cursor = 0; \
-    parser->tokens = tokenizer->tokens; \
+    parser->tokens = processor->tokens; \
     InitLinkedList((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST)); \
-    parser->file = tokenizer->file; \
+    parser->file = processor->file; \
+    parser->files = processor->files; \
     return parser; \
 } \
 char STB_CONCAT(CUR_PARSER_PREFIX, _advance)(CUR_PARSER_NAME *parser) { \
@@ -186,7 +197,9 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_expr)(CU
     int Generic; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) TypeInfo; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
+    STB_CONCAT(CUR_TOKENIZER_NAME, _Token) old_token = token; \
     int offset = token.offset; \
+    int file = token.file; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *left = NULL; \
     if (0){}_expr; \
@@ -199,7 +212,9 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_ast)(CUR
     int Generic; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) TypeInfo; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
+    STB_CONCAT(CUR_TOKENIZER_NAME, _Token) old_token = token; \
     int offset = token.offset; \
+    int file = token.file; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
     if (0){}_ast; \
 exit: \
@@ -210,7 +225,9 @@ STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_body_ast
     int Generic; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) TypeInfo; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \
+    STB_CONCAT(CUR_TOKENIZER_NAME, _Token) old_token = token; \
     int offset = token.offset; \
+    int file = token.file; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) match_token = parser->tokens.data[parser->cursor]; \
     if (0){}_body; \
 exit: \
@@ -241,10 +258,6 @@ int STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(STB_CONCAT(CUR_TYP
 }
 
 #define STB_LANG_LOOKUP_SIZE(root_scope, typeinf) STB_CONCAT3(CUR_TYPEINFO_PREFIX, _typeinfo, _lookup_size)(*(STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo)*)typeinf, root_scope)
-
-
-#define STB_LANG_PARSER_ERROR_MINOR(where, type, nam) \
-stb_lang_error_minor(parser->file.name, parser->file.contents, ((STB_CONCAT(CUR_PARSER_NAME, _AST)*)where)->offset, type, nam); \
 
 
 #define STB_LANG_DEFINE_TYPEINFO(...) \
@@ -316,6 +329,7 @@ typedef struct { \
     _n->right = NULL; \
     _n->next = NULL; \
     _n->offset = offset; \
+    _n->file = file; \
     _n; \
 })
 
@@ -329,6 +343,7 @@ typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *_n = malloc(sizeof(*_n)); \
     *_n = (STB_CONCAT(CUR_PARSER_NAME, _AST)){__VA_ARGS__}; \
     _n->offset = offset; \
+    _n->file = file; \
     _n->flags = 0; \
     _n; \
 })
@@ -343,6 +358,7 @@ typedef struct { \
     _n->right = NULL; \
     _n->next = NULL; \
     _n->offset = offset; \
+    _n->file = file; \
     _n->flags = 0; \
     _n; \
 })
@@ -365,7 +381,7 @@ while (token.type != endtok){ \
     }else {Generic = 0;} \
 } \
 if (Generic == 1){ \
-    stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ExprListError", "Split token found before end"); \
+    STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "ExprListError", "Split token found before end"); \
 } \
 STB_LANG_PARSER_EXPECT(endtok)
 
@@ -405,7 +421,7 @@ while (token.type != endtok){ \
     }else {Generic = 0;} \
 } \
 if (Generic == 1){ \
-    stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "ExprListError", "Generic found before end"); \
+    STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "ExprListError", "Generic found before end"); \
 } \
 STB_LANG_PARSER_EXPECT(endtok)
 

@@ -8,7 +8,7 @@
 #define STB_LANG_CODEGEN_CASE(typ, ...) else if( instr->type == typ ) {__VA_ARGS__;}
 #define STB_LANG_CODEGEN_2CASES(typ, typ2, ...) else if( instr->type == typ || instr->type == typ2 ) {__VA_ARGS__;}
 
-#define STB_LANG_EMIT_CODE(...) STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(gen, instr->offset, __VA_ARGS__);
+#define STB_LANG_EMIT_CODE(...) STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(gen, instr->offset, instr->file, __VA_ARGS__);
 
 
 #define STB_LANG_SIZE_OFFSET() \
@@ -45,6 +45,11 @@ gen->current_scope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))_curscope;
 
 #define STB_LANG_O
 
+#define STB_LANG_CODEGEN_ERROR_MINOR(where, fil, type, ...) \
+if (fil > gen->files.datalen){ \
+    stb_lang_error_minor(gen->file.name, gen->file.contents, where, "GenError", "Failure to generate error"); \
+} \
+stb_lang_error_minor(gen->files.data[fil].name, gen->files.data[fil].contents, where, type, __VA_ARGS__);
 
 #define STB_LANG_NEW_CODEGEN(prefix, suffix, list) \
 dymarray_typenew(char, 300, 40); \
@@ -58,17 +63,18 @@ typedef struct { \
     STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register) *regs; \
     STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _VirtualRegister) *virtual_regs; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
+    STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _File) files; \
     STB_CONCAT3(dymarray_, CUR_IR_NAME, _Symbol) symbols; \
 }CUR_CODEGEN_NAME; \
 STB_LANG_SIZE_OFFSET(); \
-void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, int offset, char *str, ...){ \
+void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, int offset, int file, char *str, ...){ \
     va_list args; \
     va_start(args, str); \
     char st[256]; \
     int len = vsnprintf(st, 256, str, args); \
     va_end(args); \
     if (len < 0 || len >= sizeof(st)) { \
-        stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "CodeGenError", "Too large of a buffer is being written at once"); \
+        STB_LANG_CODEGEN_ERROR_MINOR(offset, file, "CodeGenError", "Too large of a buffer is being written at once"); \
         return; \
     } \
     int space = gen->code.datalen + len + 1; \
@@ -80,7 +86,7 @@ void STB_CONCAT(CUR_CODEGEN_PREFIX, _add_text)(CUR_CODEGEN_NAME *gen, int offset
         gen->code.datacap = cap; \
         gen->code.data = realloc(gen->code.data, gen->code.datacap); \
         if (!gen->code.data){ \
-            stb_lang_error_minor(gen->file.name, gen->file.contents, offset, "CodeGenError", "Not enough memory to store assembly output"); \
+            STB_LANG_CODEGEN_ERROR_MINOR(offset, file, "CodeGenError", "Not enough memory to store assembly output"); \
             return; \
         } \
     } \
@@ -99,6 +105,7 @@ CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_REGALLOC_NAME *regal
     gen->regs = regalloc->regs; \
     gen->virtual_regs = regalloc->virtual_regs; \
     gen->file = regalloc->file; \
+    gen->files = regalloc->files; \
     gen->symbols = regalloc->symbols; \
     STB_CONCAT(CUR_IR_NAME, _Instr) *instr = (gen->instrs.data + gen->cursor); \
  \
@@ -107,7 +114,7 @@ CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_REGALLOC_NAME *regal
 } \
 char STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
     if(0){}list else { \
-        stb_lang_error_minor(gen->file.name, gen->file.contents, instr->offset, "CodegenError", "Could not convert IR instruction with type '%d' into code", instr->type); \
+        STB_LANG_CODEGEN_ERROR_MINOR(instr->offset, instr->file, "CodegenError", "Could not convert IR instruction with type '%d' into code", instr->type); \
     }; \
     return 0; \
 }; \

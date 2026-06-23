@@ -1,4 +1,4 @@
-void printf(string fmt, ...)
+#!include "examples/include/std.lang"
 
 int main(int argc, ptr<string> argv){
     int i = 0;

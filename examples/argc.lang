@@ -1,4 +1,4 @@
-void printf(string fmt, ...)
+#!include "examples/include/std.lang"
 
 int main(int argc, int argv){
     printf("Argument Count = %d!\n", argc);

@@ -1,6 +1,4 @@
-ptr<int> malloc(int size);
-void exit(int return);
-void printf(string fmt, ...)
+#!include "examples/include/std.lang"
 
 string int_to_string(int num){
     ptr<int> str = malloc(200)

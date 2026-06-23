@@ -149,6 +149,7 @@ typedef struct { \
     STB_CONCAT(CUR_TOKENIZER_NAME, _TokenType) type; \
     char *value; \
     int offset; \
+    int file; \
 }STB_CONCAT(CUR_TOKENIZER_NAME, _Token); \
 STB_LANG_INVOKE_TYPENEW(STB_CONCAT(CUR_TOKENIZER_NAME, _Token)) \
 \

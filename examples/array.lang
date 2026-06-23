@@ -1,6 +1,4 @@
-ptr<int> malloc(int size);
-void exit(int return);
-void printf(string fmt, ...)
+#!include "examples/include/std.lang"
 
 int main(int argc, ptr<string> argv){
     int[10] a;

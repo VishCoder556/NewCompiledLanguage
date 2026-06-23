@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include "../libraries/error/error.h"
 #include "../libraries/tokenizer/tokenizer.h"
+#include "../libraries/preprocessor/preprocessor.h"
 #include "../libraries/parser/parser.h"
 #include "../libraries/typeinfo/typeinfo.h"
 #include "../libraries/ir/ir.h"
@@ -57,7 +58,8 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_OR,
         TOKEN_BOR,
         TOKEN_CARET,
-        TOKEN_DOT
+        TOKEN_DOT,
+        TOKEN_HASH
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
@@ -74,6 +76,7 @@ STB_LANG_NEW_TOKENIZER(
         STB_LANG_TOKEN_CHAR('%', TOKEN_MODULO)
         STB_LANG_TOKEN_CHAR('^', TOKEN_CARET)
         STB_LANG_TOKEN_CHAR('.', TOKEN_DOT)
+        STB_LANG_TOKEN_CHAR('#', TOKEN_HASH)
         STB_LANG_SKIP('\n')
     ),
     STB_LANG_ALPHA(TOKEN_ID)
@@ -91,6 +94,46 @@ STB_LANG_NEW_TOKENIZER(
 )
 
 
+#define CUR_PREPROCESSOR_NAME Lang_Preprocessor
+#define CUR_PREPROCESSOR_PREFIX lang_preprocessor
+STB_LANG_NEW_PREPROCESSOR(
+
+STB_LANG_PREPROCESSOR_PROCESS(
+    if (token.type == TOKEN_HASH){
+        STB_LANG_SAVE(oldcursor, processor->cursor);
+        STB_LANG_PROCESSOR_ADVANCE();
+        if (token.type == TOKEN_NOT){
+            STB_LANG_PROCESSOR_ADVANCE();
+            if (token.type == TOKEN_ID){
+                if (strcmp(token.value, "include") == 0){
+                    STB_LANG_PROCESSOR_ADVANCE();
+                    if (token.type == TOKEN_STRING){
+                STB_LANG_SAVE(name, token.value);
+                        STB_LANG_PROCESSOR_TRIM(oldcursor, processor->cursor+1);
+                        processor->cursor = oldcursor;
+                        STB_LANG_PROCESSOR_UPDATE();
+
+                        Lang_Tokenizer *_tokenizer = lang_tokenizer_init(name);
+                        while (lang_tokenizer_token(_tokenizer) == 0){
+                        }
+                        Lang_Preprocessor *_processor = lang_preprocessor_init(_tokenizer, processor->fl+1);
+                        while (lang_preprocessor_token(_processor) == 0){
+                        }
+                        STB_LANG_PROCESSOR_INSERT(oldcursor, _processor);
+
+                        free(_tokenizer);
+                        free(_processor);
+
+                    };
+                }
+            }
+        }else {
+            stb_lang_error_minor(processor->file.name, processor->file.contents, token.offset, "SyntaxError", "Unexpected token after `#`");
+        }
+    }
+)
+)
+        
 
 #define CUR_TYPEINFO_NAME Lang_TypeInfo
 #define CUR_TYPEINFO_PREFIX lang_typeinfo
@@ -278,7 +321,6 @@ STB_LANG_PARSE_AST(
             STB_LANG_PARSER_BACK();
 not_funcall:
             ;
-            // stb_lang_error_minor(parser->file.name, parser->file.contents, token.offset, "hi", "hi");
             STB_LANG_GET_AST_EXPR(lhs, 0);
             STB_LANG_IF_TOKEN(TOKEN_EQ,
                 STB_LANG_PARSER_ADVANCE();
@@ -516,7 +558,7 @@ STB_LANG_NEW_TYPEINFO(
         }else if (STB_LANG_LHS(ast)->type == AST_DEREF){
             // Deref already did the typeinfo--
         }else {
-            STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
+            STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
         };
         if (STB_LANG_LHS(ast)->type == AST_INDEX || STB_LANG_LHS(ast)->type == AST_ACCESS){
             // STB_LANG_EXPECT_TYPE_EQ(STB_LANG_LHS(ast), STB_LANG_RHS(ast));
@@ -600,7 +642,7 @@ STB_LANG_NEW_TYPEINFO(
 
         Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
         if (typinf.ptrnum == 0 && typinf.type != AST_TYPE_ARRAY){
-            STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
+            STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
         }
         typinf.ptrnum--;
         ast->typeinfo = typinf;
@@ -615,7 +657,7 @@ STB_LANG_NEW_TYPEINFO(
         }else if (ast->typeinfo.type == AST_TYPE_ARRAY){
             ast->typeinfo = *(Lang_TypeInfo_Typeinfo*)(ast->typeinfo.data.array.elem_type);
         }else {
-            STB_LANG_TYPEINFO_ERROR_MINOR(ast, "DerefError", "Could not dereference anything that's not a pointer or array");
+            STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
         };
     )
     STB_LANG_TYPEINFO_CASE(AST_ACCESS,
@@ -743,7 +785,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
                 )
 
                 if (found == 0){
-                    STB_LANG_IR_ERROR_MINOR(ast, "StructError", "Could not find field \"%s\" in \"struct %s\"", STB_LANG_LHS(ast)->value, symbol->name);
+                    STB_LANG_IR_ERROR_MINOR(ast->offset, ast->file, "StructError", "Could not find field \"%s\" in \"struct %s\"", STB_LANG_LHS(ast)->value, symbol->name);
                 }
                 STB_LANG_IR_NEW_TEMP(addr_reg);
                 STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
@@ -782,7 +824,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
                 }
             )
             if (found == 0){
-                STB_LANG_IR_ERROR_MINOR(ast, "StructError", "Could not find field \"%s\" in \"struct %s\"", ast->value, symbol->name);
+                STB_LANG_IR_ERROR_MINOR(ast->offset, ast->file, "StructError", "Could not find field \"%s\" in \"struct %s\"", ast->value, symbol->name);
             }
             STB_LANG_IR_NEW_TEMP(addr_reg);
             STB_LANG_IR_NEW_TEMP(dest_reg);
@@ -1405,16 +1447,20 @@ int main(int argc, char **argv){
     //     printf("%d, %s\n", tokenizer->tokens.data[i].type, tokenizer->tokens.data[i].value);
     // }
     
+    Lang_Preprocessor *processor = lang_preprocessor_init(tokenizer, 0);
+    while (lang_preprocessor_token(processor) == 0){
+    }
 
-    Lang_Parser *parser = lang_parser_init(tokenizer);
+
+    Lang_Parser *parser = lang_parser_init(processor);
     while (lang_parser_parse_body(parser) == 0){
     }
+
+
 
     Lang_TypeInfo *checker = lang_typeinfo_init(parser);
     while (lang_typeinfo_check(checker) == 0){
     }
-
-
 
 
     Lang_IR *ir = lang_ir_init(checker);

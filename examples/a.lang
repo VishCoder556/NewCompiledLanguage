@@ -1,6 +1,4 @@
-ptr<int> malloc(int size);
-void exit(int return);
-void printf(string fmt, ...)
+#!include "examples/include/std.lang"
 
 struct Vector {
     int x
@@ -9,6 +7,7 @@ struct Vector {
 }
 
 int main() {
+
     struct Vector v
     v.x = 25
     v.y = cast(char, 200)
