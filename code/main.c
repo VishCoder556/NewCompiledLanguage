@@ -223,7 +223,7 @@ STB_LANG_PARSER_INIT(
     InitLinkedList(parser->flat_scope, Lang_Parser_AST);
 ),
 STB_LANG_PARSER_SUFFIX(
-    if (parser->flat_scope != NULL){
+    if (GetLinkedListHead(parser->flat_scope, Lang_Parser_AST) != NULL){
         if (GetLinkedListLen(parser->flat_scope, Lang_Parser_AST) > 0){
             Lang_Parser_AST *ast = STB_LANG_AST(.type=AST_FUNCDEF, .typeinfo=-1, .value="main", .left=NULL, .right=STB_LANG_LINKED_LIST(parser->flat_scope));
             AppendToLinkedList((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST), *ast);
