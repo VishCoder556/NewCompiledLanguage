@@ -151,7 +151,6 @@ STB_LANG_DEFINE_TYPEINFO(
     AST_TYPE_STRUCT
 )
 
-
 STB_LANG_NEW_PARSER(
 STB_LANG_BINDING_POWER(
     STB_LANG_MATCH_BINDING_POWER(TOKEN_OR, 1)
@@ -212,15 +211,70 @@ STB_LANG_ASTS(
     AST_STORE,
     AST_INDEX,
     AST_STRUCT,
-    AST_ACCESS
+    AST_ACCESS,
+    AST_MODE
+),
+STB_LANG_PARSER_FIELDS(
+    int scope_flat;
+    Lang_Parser_ASTList flat_scope;
+),
+STB_LANG_PARSER_INIT(
+    parser->scope_flat = 0;
+    InitLinkedList(parser->flat_scope, Lang_Parser_AST);
+),
+STB_LANG_PARSER_SUFFIX(
+    if (parser->flat_scope != NULL){
+        if (GetLinkedListLen(parser->flat_scope, Lang_Parser_AST) > 0){
+            Lang_Parser_AST *ast = STB_LANG_AST(.type=AST_FUNCDEF, .typeinfo=-1, .value="main", .left=NULL, .right=STB_LANG_LINKED_LIST(parser->flat_scope));
+            AppendToLinkedList((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST), *ast);
+        }
+    }
 ),
 STB_LANG_PARSE_BODY(
+    STB_LANG_IF_TOKEN(TOKEN_HASH,
+        STB_LANG_PARSER_ADVANCE();
+        STB_LANG_PARSER_EXPECT(TOKEN_NOT);
+        char data[150];
+        strncpy(data, "", 150);
+        int dot = 1;
+        while (1){
+            if (dot == 0){
+                break;
+            }
+            if (token.type == TOKEN_ID){
+                strncat(data, token.value, strlen(token.value));
+                if (dot == 1){dot = 0;}
+                STB_LANG_PARSER_ADVANCE();
+            }
+            if (token.type == TOKEN_DOT && dot == 0){
+                strncat(data, ".", 1);
+                dot = 1;
+                STB_LANG_PARSER_ADVANCE();
+
+                if (parser->cursor + 1 >= parser->tokens.datalen){
+                    break;
+                }
+            }else {
+                if (parser->cursor + 1 >= parser->tokens.datalen){
+                    break;
+                }
+                break;
+            };
+        };
+        if (strcmp(data, "scope.flat") == 0){
+            parser->scope_flat = 1;
+        }else if (strcmp(data, "scope.structured") == 0){
+            parser->scope_flat = 0;
+        }
+        return STB_LANG_AST(.type=AST_MODE, .typeinfo=-1, .value=strdup(data), .left=NULL, .right=NULL);
+    )
     STB_LANG_IF_VALUE(TOKEN_ID, "struct",
         STB_LANG_PARSER_ADVANCE();
         STB_LANG_SAVE(struct_name, token);
         STB_LANG_PARSER_ADVANCE();
         STB_CONCAT(CUR_PARSER_NAME, _ASTList) fields = (STB_CONCAT(CUR_PARSER_NAME, _ASTList)){0};
         InitLinkedList(fields, STB_CONCAT(CUR_PARSER_NAME, _AST));
+        if (token.type == TOKEN_LB){
         STB_LANG_PARSE_CUSTOM_LIST(TOKEN_LB, -1, TOKEN_RB,
             STB_LANG_GET_TYPEINFO(argt){
                 STB_LANG_IF_TOKEN(TOKEN_ID,
@@ -235,6 +289,10 @@ STB_LANG_PARSE_BODY(
         typeinfo.data.struct1.symbol = NULL;
         typeinfo.data.struct1.size = -1;
         return STB_LANG_AST(.type=AST_STRUCT, .typeinfo=typeinfo, .value=struct_name.value, .left=STB_LANG_LINKED_LIST(fields), .right=NULL);
+        }else {
+            STB_LANG_PARSER_BACK();
+            STB_LANG_PARSER_BACK(); // Undo cursor to initial stage
+        }
     )
     STB_LANG_GET_TYPEINFO(typeinfo){
         STB_LANG_IF_TOKEN(TOKEN_ID, // Function name
@@ -243,6 +301,7 @@ STB_LANG_PARSE_BODY(
 
             STB_CONCAT(CUR_PARSER_NAME, _ASTList) params = (STB_CONCAT(CUR_PARSER_NAME, _ASTList)){0};
             InitLinkedList(params, STB_CONCAT(CUR_PARSER_NAME, _AST));
+        if (token.type == TOKEN_LP){
             STB_LANG_PARSE_CUSTOM_LIST(TOKEN_LP, TOKEN_COMMA, TOKEN_RP,
                 STB_LANG_GET_TYPEINFO(argt){
                     STB_LANG_IF_TOKEN(TOKEN_ID,
@@ -265,6 +324,11 @@ STB_LANG_PARSE_BODY(
                     )
                 }
             )
+        }else {
+            parser->cursor = initial_cursor;
+            STB_LANG_PARSER_UPDATE();
+            goto _exit;
+        }
 
             if (token.type == TOKEN_LB) {
                 STB_LANG_PARSE_STATEMENT_LIST(stmnts, TOKEN_LB, -1, TOKEN_RB)
@@ -274,6 +338,20 @@ STB_LANG_PARSE_BODY(
             }
         )
     }
+    _exit:
+        if (parser->scope_flat == 1){
+            AppendToLinkedList(parser->flat_scope, Lang_Parser_AST, *STB_LANG_PARSE_STATEMENT());
+            STB_LANG_PARSER_UPDATE();
+            // if (token.type == TOKEN_NOT){
+            //     // STB_LANG_PARSE_STATEMENT_LIST skips the `#` if it finds it, so we have to manually go back
+            //     STB_LANG_PARSER_BACK();
+            // }
+            // return STB_LANG_AST(.type=AST_FUNCDEF, .typeinfo=-1, .value="main", .left=NULL, .right=STB_LANG_LINKED_LIST(stmnts));
+            //
+            // printf("Here, %d, %s!\n", token.type, token.value);
+            return STB_LANG_PARSE_TOP();
+        }
+
 ),
 STB_LANG_PARSE_AST(
     // No ASTS yet!
@@ -509,6 +587,9 @@ STB_LANG_TYPEINFO_SIZE(
 
 
 STB_LANG_NEW_TYPEINFO(
+    STB_LANG_TYPEINFO_CASE(AST_MODE,
+        // Nothing yet
+    )
     STB_LANG_TYPEINFO_CASE(AST_FUNCDECL, 
         STB_LANG_MAKE_SCOPE(ast->value);
         STB_LANG_ADD_FUNCTION(ast->value,
@@ -733,6 +814,9 @@ STB_LANG_NEW_IR(
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDECL,
             // Skip
+        )
+        STB_LANG_IR_CASE(AST_MODE,
+            // Skip for now
         )
         STB_LANG_IR_CASE(AST_FUNCDEF,
             STB_LANG_IR_EMIT(IR_FUNCDEF_BEGIN, STB_LANG_IR_OPERAND(IR_VAR, ast->value), NULL, NULL);

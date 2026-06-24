@@ -113,6 +113,7 @@ CUR_CODEGEN_NAME *STB_CONCAT(CUR_CODEGEN_PREFIX, _init)(CUR_REGALLOC_NAME *regal
     return gen; \
 } \
 char STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
+    if (instr == NULL) return -1; \
     if(0){}list else { \
         STB_LANG_CODEGEN_ERROR_MINOR(instr->offset, instr->file, "CodegenError", "Could not convert IR instruction with type '%d' into code", instr->type); \
     }; \
@@ -120,6 +121,7 @@ char STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(CUR_CODEGEN_NAME *gen, STB_CONCAT(CUR_
 }; \
 char STB_CONCAT(CUR_CODEGEN_PREFIX, _ir)(CUR_CODEGEN_NAME *gen){ \
     STB_CONCAT(CUR_IR_NAME, _Instr) *instr = (gen->instrs.data + gen->cursor); \
+    if (gen->instrs.datalen == 0){return -1;} \
     if (STB_CONCAT(CUR_CODEGEN_PREFIX, _gen)(gen, instr) == -1){return -1;}; \
     if (gen->cursor >= gen->instrs.datalen - 1){ \
         suffix;return -1; \
