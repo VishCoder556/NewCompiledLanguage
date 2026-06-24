@@ -4,5 +4,6 @@ int main(){
     a = 5
     // ^ should work; declaration auto is on
     #!declaration.var.manual
-    return a;
+    printf("%d\n", a)
+    return 0;
 }

@@ -139,6 +139,43 @@ STB_LANG_PREPROCESSOR_PROCESS(
 #define CUR_TYPEINFO_PREFIX lang_typeinfo
 
 
+#define STB_LANG_PARSER_MODE() \
+        STB_LANG_PARSER_ADVANCE(); \
+        STB_LANG_PARSER_EXPECT(TOKEN_NOT); \
+        char data[150]; \
+        strncpy(data, "", 150); \
+        int dot = 1; \
+        while (1){ \
+            if (dot == 0){ \
+                break; \
+            } \
+            if (token.type == TOKEN_ID){ \
+                strncat(data, token.value, strlen(token.value)); \
+                if (dot == 1){dot = 0;} \
+                STB_LANG_PARSER_ADVANCE(); \
+            } \
+            if (token.type == TOKEN_DOT && dot == 0){ \
+                strncat(data, ".", 1); \
+                dot = 1; \
+                STB_LANG_PARSER_ADVANCE(); \
+ \
+                if (parser->cursor + 1 >= parser->tokens.datalen){ \
+                    break; \
+                } \
+            }else { \
+                if (parser->cursor + 1 >= parser->tokens.datalen){ \
+                    break; \
+                } \
+                break; \
+            }; \
+        }; \
+        if (strcmp(data, "scope.flat") == 0){ \
+            parser->scope_flat = 1; \
+        }else if (strcmp(data, "scope.structured") == 0){ \
+            parser->scope_flat = 0; \
+        } \
+        return STB_LANG_AST(.type=AST_MODE, .typeinfo=-1, .value=strdup(data), .left=NULL, .right=NULL);
+
 #define CUR_PARSER_NAME Lang_Parser
 #define CUR_PARSER_PREFIX lang_parser
 
@@ -232,42 +269,9 @@ STB_LANG_PARSER_SUFFIX(
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_IF_TOKEN(TOKEN_HASH,
-        STB_LANG_PARSER_ADVANCE();
-        STB_LANG_PARSER_EXPECT(TOKEN_NOT);
-        char data[150];
-        strncpy(data, "", 150);
-        int dot = 1;
-        while (1){
-            if (dot == 0){
-                break;
-            }
-            if (token.type == TOKEN_ID){
-                strncat(data, token.value, strlen(token.value));
-                if (dot == 1){dot = 0;}
-                STB_LANG_PARSER_ADVANCE();
-            }
-            if (token.type == TOKEN_DOT && dot == 0){
-                strncat(data, ".", 1);
-                dot = 1;
-                STB_LANG_PARSER_ADVANCE();
-
-                if (parser->cursor + 1 >= parser->tokens.datalen){
-                    break;
-                }
-            }else {
-                if (parser->cursor + 1 >= parser->tokens.datalen){
-                    break;
-                }
-                break;
-            };
-        };
-        if (strcmp(data, "scope.flat") == 0){
-            parser->scope_flat = 1;
-        }else if (strcmp(data, "scope.structured") == 0){
-            parser->scope_flat = 0;
-        }
-        return STB_LANG_AST(.type=AST_MODE, .typeinfo=-1, .value=strdup(data), .left=NULL, .right=NULL);
+        STB_LANG_PARSER_MODE();
     )
+
     STB_LANG_IF_VALUE(TOKEN_ID, "struct",
         STB_LANG_PARSER_ADVANCE();
         STB_LANG_SAVE(struct_name, token);
@@ -354,7 +358,10 @@ STB_LANG_PARSE_BODY(
 
 ),
 STB_LANG_PARSE_AST(
-    // No ASTS yet!
+    STB_LANG_IF_TOKEN(TOKEN_HASH,
+        STB_LANG_PARSER_MODE();
+    )
+
     STB_LANG_IF_VALUE(TOKEN_ID, "if", 
         STB_LANG_PARSER_ADVANCE();
         STB_LANG_PARSER_EXPECT(TOKEN_LP)
@@ -465,7 +472,6 @@ STB_LANG_PARSE_EXPR(
             left = STB_LANG_AST_FUNCALL(AST_FUNCALL, name, args)
         ) STB_LANG_ELSE(
             left = STB_LANG_AST_LITERAL(AST_VAR, name);
-            // printf("Here, %d, %s, %d, %s\n", left->type == AST_VAR, left->value, token.type, token.value);
             goto skip;
         )
     )
@@ -587,182 +593,206 @@ STB_LANG_TYPEINFO_SIZE(
 
 
 STB_LANG_NEW_TYPEINFO(
-    STB_LANG_TYPEINFO_CASE(AST_MODE,
-        // Nothing yet
-    )
-    STB_LANG_TYPEINFO_CASE(AST_FUNCDECL, 
-        STB_LANG_MAKE_SCOPE(ast->value);
-        STB_LANG_ADD_FUNCTION(ast->value,
-            STB_LANG_FUNCTION_RETURN(ast->typeinfo);
-            STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
+    STB_LANG_TYPEINFO_FIELDS(
+        int decl_auto;
+    ),
+    STB_LANG_TYPEINFO_INIT(
+        checker->decl_auto = 0;
+    ),
+    STB_LANG_TYPEINFO_SUFFIX(
+        
+    ),
+    STB_LANG_TYPEINFO_CASES(
+        STB_LANG_TYPEINFO_CASE(AST_MODE,
+            if (ast->value != NULL){
+                if (strcmp(ast->value, "declaration.var.auto") == 0){
+                    checker->decl_auto = 1;
+                }else if (strcmp(ast->value, "declaration.var.manual") == 0){
+                    checker->decl_auto = 0;
+                }
+            }
         )
-        STB_LANG_EXPAND_PARAMS();
-    )
-    STB_LANG_TYPEINFO_CASE(AST_FUNCDEF, 
-        STB_LANG_MAKE_SCOPE(ast->value);
-        STB_LANG_ADD_FUNCTION(ast->value,
-            STB_LANG_FUNCTION_RETURN(ast->typeinfo);
-            STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
-        )
-        STB_LANG_EXPAND_PARAMS();
-        STB_LANG_EXPAND_BLOCK();
-    )
-    STB_LANG_TYPEINFO_CASE(AST_STRUCT, 
-        int size = 0;
-        STB_LANG_ITERATE_LINKED_LIST(STB_LANG_GET_AST(ast->left), head, Lang_Parser_AST,
-            STB_LANG_EXPAND(head);
-            size += STB_LANG_LOOKUP_SIZE(checker->root_scope, &head->typeinfo);
-        )
-        ast->typeinfo.data.struct1.size = size;
-        ast->typeinfo.type = AST_TYPE_STRUCT;
-        STB_LANG_ADD_DATA(ast->value, 
-            // STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
-            symnew.data.struct1.structdef = STB_LANG_AS_AST(ast);
-            STB_LANG_SET_SYMBOL(ast->typeinfo.data.struct1.symbol, STB_LANG_CURRENT_SYMBOL());
-        )
-    )
-    STB_LANG_TYPEINFO_CASE(AST_STORE, 
-        STB_LANG_EXPAND_LHS();
-        STB_LANG_EXPAND_RHS();
-        STB_LANG_INFER_TYPE(ast->value);
-        ast->typeinfo = STB_LANG_LHS(ast)->typeinfo;
-        int typ = STB_LANG_LHS(ast)->type;
-        if (typ == AST_ACCESS || typ == AST_DEREF || typ == AST_INDEX){
-            ast->typeinfo = STB_LANG_LHS(STB_LANG_LHS(ast))->typeinfo;
-        }
-        if (ast->typeinfo.ptrnum != 0){
-            ast->typeinfo.ptrnum--;
-        }else if (ast->typeinfo.type == AST_TYPE_ARRAY){
-            ast->typeinfo = *(Lang_TypeInfo_Typeinfo*)(ast->typeinfo.data.array.elem_type);
-        }else if (STB_LANG_LHS(ast)->type == AST_ACCESS){
-            ast->typeinfo = STB_LANG_LHS(ast)->typeinfo;
-        }else if (STB_LANG_LHS(ast)->type == AST_DEREF){
-            // Deref already did the typeinfo--
-        }else {
-            STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
-        };
-        if (STB_LANG_LHS(ast)->type == AST_INDEX || STB_LANG_LHS(ast)->type == AST_ACCESS){
-            // STB_LANG_EXPECT_TYPE_EQ(STB_LANG_LHS(ast), STB_LANG_RHS(ast));
-        }else {
-            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-        }
-    )
-    STB_LANG_TYPEINFO_CASE(AST_ASSIGN, 
-        STB_LANG_EXPAND_LHS();
-        STB_LANG_EXPAND_RHS();
-        if (STB_LANG_OF_AST(ast->left, type) == AST_VAR){
-            STB_LANG_INFER_TYPE(STB_LANG_OF_AST(ast->left, value));
-            STB_LANG_REGISTER_VARIABLE(STB_LANG_OF_AST(ast->left, value), ast->typeinfo)
-        }
-        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    )
-    STB_LANG_TYPEINFO_CASE(AST_DECL,
-        if (STB_LANG_RHS(ast) != NULL){
-            STB_LANG_EXPAND_RHS();
-            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-        }
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
-        STB_LANG_VARIABLE(ast);
-    )
-    STB_LANG_TYPEINFO_CASE(AST_VAR,
-        STB_LANG_INFER_TYPE(ast->value);
-    )
-    STB_LANG_TYPEINFO_CASE(AST_INT,
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(.type=AST_TYPE_INT, .ptrnum=0));
-    )
-    STB_LANG_TYPEINFO_CASE(AST_STRING,
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(.type=AST_TYPE_STRING, .ptrnum=0));
-    )
-    STB_LANG_TYPEINFO_6CASES(AST_LT, AST_LTE, AST_GT, AST_GTE, AST_EQ, AST_NEQ,
-        STB_LANG_EXPAND_RHS();
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
-        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    )
-    STB_LANG_TYPEINFO_5CASES(AST_ADD, AST_SUB, AST_MUL, AST_DIV, AST_MODULO,
-        STB_LANG_EXPAND_LHS();
-        STB_LANG_EXPAND_RHS();
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
-        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    )
-    STB_LANG_TYPEINFO_5CASES(AST_AND, AST_OR, AST_BAND, AST_BOR, AST_XOR,
-        STB_LANG_EXPAND_RHS();
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
-        STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
-    )
-    STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
-        STB_LANG_EXPAND_ARGS();
-        STB_LANG_FIND_FUNCTION(checker->root_scope, ast->value, 
-            STB_LANG_TYPEINFO_ASSUME_TYPE(symnew.typeinfo);
-            STB_LANG_FUNCTION_CHECK_LIST(ast->left);
-        )
-    )
-    STB_LANG_TYPEINFO_CASE(AST_IF,
-        STB_LANG_EXPAND_ARGS();
-        STB_LANG_EXPAND_BLOCK();
-        STB_LANG_EXPAND_LIST(ast->middle);
-    )
-    STB_LANG_TYPEINFO_CASE(AST_WHILE,
-        STB_LANG_EXPAND_ARGS();
-        STB_LANG_EXPAND_BLOCK();
-    )
-    STB_LANG_TYPEINFO_CASE(AST_RET,
-        STB_LANG_EXPAND_ARGS();
-    )
-    STB_LANG_TYPEINFO_CASE(AST_CAST,
-        STB_LANG_EXPAND_LHS();
-    )
-    STB_LANG_TYPEINFO_CASE(AST_REF,
-        STB_LANG_EXPAND_LHS();
-
-        Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
-        typinf.ptrnum++;
-        ast->typeinfo = typinf;
-    )
-    STB_LANG_TYPEINFO_CASE(AST_DEREF,
-        STB_LANG_EXPAND_LHS();
-
-        Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
-        if (typinf.ptrnum == 0 && typinf.type != AST_TYPE_ARRAY){
-            STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
-        }
-        typinf.ptrnum--;
-        ast->typeinfo = typinf;
-    )
-    STB_LANG_TYPEINFO_CASE(AST_INDEX,
-        STB_LANG_EXPAND_LHS();
-
-        Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
-        ast->typeinfo = typinf;
-        if (ast->typeinfo.ptrnum != 0){
-            ast->typeinfo.ptrnum--;
-        }else if (ast->typeinfo.type == AST_TYPE_ARRAY){
-            ast->typeinfo = *(Lang_TypeInfo_Typeinfo*)(ast->typeinfo.data.array.elem_type);
-        }else {
-            STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
-        };
-    )
-    STB_LANG_TYPEINFO_CASE(AST_ACCESS,
-        STB_LANG_EXPAND_LHS();
-        STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
-
-        STB_LANG_FIND_DATA(checker->root_scope, STB_LANG_LHS(ast)->typeinfo.data.struct1.name,
-            STB_LANG_FIND_DATA(checker->root_scope, STB_LANG_LHS(ast)->typeinfo.data.struct1.name,
-                Lang_Parser_AST *structdef = STB_LANG_LHS(STB_LANG_GET_AST(symnew.data.struct1.structdef));
-                STB_LANG_ITERATE_LINKED_LIST(structdef, field, Lang_Parser_AST,
-                    if (field->type == AST_VAR){
-                        if (strcmp(field->value, ast->value) == 0){
-                            ast->typeinfo = field->typeinfo;
-                        }
-                    }
-                )
+        STB_LANG_TYPEINFO_CASE(AST_FUNCDECL, 
+            STB_LANG_MAKE_SCOPE(ast->value);
+            STB_LANG_ADD_FUNCTION(ast->value,
+                STB_LANG_FUNCTION_RETURN(ast->typeinfo);
+                STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
             )
-
-            Lang_TypeInfo_Typeinfo *typeinfo = &(ast->typeinfo);
-            STB_LANG_SET_SYMBOL(typeinfo->data.struct1.symbol, symnew);
+            STB_LANG_EXPAND_PARAMS();
         )
-    )
-    STB_LANG_TYPEINFO_CASE(AST_EXPR,
-        STB_LANG_EXPAND_LHS();
+        STB_LANG_TYPEINFO_CASE(AST_FUNCDEF, 
+            STB_LANG_MAKE_SCOPE(ast->value);
+            STB_LANG_ADD_FUNCTION(ast->value,
+                STB_LANG_FUNCTION_RETURN(ast->typeinfo);
+                STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
+            )
+            STB_LANG_EXPAND_PARAMS();
+            STB_LANG_EXPAND_BLOCK();
+        )
+        STB_LANG_TYPEINFO_CASE(AST_STRUCT, 
+            int size = 0;
+            STB_LANG_ITERATE_LINKED_LIST(STB_LANG_GET_AST(ast->left), head, Lang_Parser_AST,
+                STB_LANG_EXPAND(head);
+                size += STB_LANG_LOOKUP_SIZE(checker->root_scope, &head->typeinfo);
+            )
+            ast->typeinfo.data.struct1.size = size;
+            ast->typeinfo.type = AST_TYPE_STRUCT;
+            STB_LANG_ADD_DATA(ast->value, 
+                // STB_LANG_FUNCTION_ADD_PARAMS(STB_LANG_GET_AST(ast->left));
+                symnew.data.struct1.structdef = STB_LANG_AS_AST(ast);
+                STB_LANG_SET_SYMBOL(ast->typeinfo.data.struct1.symbol, STB_LANG_CURRENT_SYMBOL());
+            )
+        )
+        STB_LANG_TYPEINFO_CASE(AST_STORE, 
+            STB_LANG_EXPAND_LHS();
+            STB_LANG_EXPAND_RHS();
+            STB_LANG_INFER_TYPE(ast->value);
+            ast->typeinfo = STB_LANG_LHS(ast)->typeinfo;
+            int typ = STB_LANG_LHS(ast)->type;
+            if (typ == AST_ACCESS || typ == AST_DEREF || typ == AST_INDEX){
+                ast->typeinfo = STB_LANG_LHS(STB_LANG_LHS(ast))->typeinfo;
+            }
+            if (ast->typeinfo.ptrnum != 0){
+                ast->typeinfo.ptrnum--;
+            }else if (ast->typeinfo.type == AST_TYPE_ARRAY){
+                ast->typeinfo = *(Lang_TypeInfo_Typeinfo*)(ast->typeinfo.data.array.elem_type);
+            }else if (STB_LANG_LHS(ast)->type == AST_ACCESS){
+                ast->typeinfo = STB_LANG_LHS(ast)->typeinfo;
+            }else if (STB_LANG_LHS(ast)->type == AST_DEREF){
+                // Deref already did the typeinfo--
+            }else {
+                STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
+            };
+            if (STB_LANG_LHS(ast)->type == AST_INDEX || STB_LANG_LHS(ast)->type == AST_ACCESS){
+                // STB_LANG_EXPECT_TYPE_EQ(STB_LANG_LHS(ast), STB_LANG_RHS(ast));
+            }else {
+                STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+            }
+        )
+        STB_LANG_TYPEINFO_CASE(AST_ASSIGN, 
+            STB_LANG_EXPAND_LHS();
+            STB_LANG_EXPAND_RHS();
+            if (STB_LANG_OF_AST(ast->left, type) == AST_VAR){
+                STB_LANG_INFER_TYPE(STB_LANG_OF_AST(ast->left, value));
+                if (ast->typeinfo.type == -1){
+                    if (checker->decl_auto == 0){
+                        STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "AssignError", "Variable \"%s\" has not been declared before being assigned", STB_LANG_OF_AST(ast->left, value));
+                    }else {
+                        ast->typeinfo = STB_LANG_RHS(ast)->typeinfo;
+                    }
+                }
+                STB_LANG_REGISTER_VARIABLE(STB_LANG_OF_AST(ast->left, value), ast->typeinfo)
+            }
+            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        )
+        STB_LANG_TYPEINFO_CASE(AST_DECL,
+            if (STB_LANG_RHS(ast) != NULL){
+                STB_LANG_EXPAND_RHS();
+                STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+            }
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
+            STB_LANG_VARIABLE(ast);
+        )
+        STB_LANG_TYPEINFO_CASE(AST_VAR,
+            STB_LANG_INFER_TYPE(ast->value);
+        )
+        STB_LANG_TYPEINFO_CASE(AST_INT,
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(.type=AST_TYPE_INT, .ptrnum=0));
+        )
+        STB_LANG_TYPEINFO_CASE(AST_STRING,
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(.type=AST_TYPE_STRING, .ptrnum=0));
+        )
+        STB_LANG_TYPEINFO_6CASES(AST_LT, AST_LTE, AST_GT, AST_GTE, AST_EQ, AST_NEQ,
+            STB_LANG_EXPAND_RHS();
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        )
+        STB_LANG_TYPEINFO_5CASES(AST_ADD, AST_SUB, AST_MUL, AST_DIV, AST_MODULO,
+            STB_LANG_EXPAND_LHS();
+            STB_LANG_EXPAND_RHS();
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
+            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        )
+        STB_LANG_TYPEINFO_5CASES(AST_AND, AST_OR, AST_BAND, AST_BOR, AST_XOR,
+            STB_LANG_EXPAND_RHS();
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        )
+        STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
+            STB_LANG_EXPAND_ARGS();
+            STB_LANG_FIND_FUNCTION(checker->root_scope, ast->value, 
+                STB_LANG_TYPEINFO_ASSUME_TYPE(symnew.typeinfo);
+                STB_LANG_FUNCTION_CHECK_LIST(ast->left);
+            )
+        )
+        STB_LANG_TYPEINFO_CASE(AST_IF,
+            STB_LANG_EXPAND_ARGS();
+            STB_LANG_EXPAND_BLOCK();
+            STB_LANG_EXPAND_LIST(ast->middle);
+        )
+        STB_LANG_TYPEINFO_CASE(AST_WHILE,
+            STB_LANG_EXPAND_ARGS();
+            STB_LANG_EXPAND_BLOCK();
+        )
+        STB_LANG_TYPEINFO_CASE(AST_RET,
+            STB_LANG_EXPAND_ARGS();
+        )
+        STB_LANG_TYPEINFO_CASE(AST_CAST,
+            STB_LANG_EXPAND_LHS();
+        )
+        STB_LANG_TYPEINFO_CASE(AST_REF,
+            STB_LANG_EXPAND_LHS();
+
+            Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
+            typinf.ptrnum++;
+            ast->typeinfo = typinf;
+        )
+        STB_LANG_TYPEINFO_CASE(AST_DEREF,
+            STB_LANG_EXPAND_LHS();
+
+            Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
+            if (typinf.ptrnum == 0 && typinf.type != AST_TYPE_ARRAY){
+                STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
+            }
+            typinf.ptrnum--;
+            ast->typeinfo = typinf;
+        )
+        STB_LANG_TYPEINFO_CASE(AST_INDEX,
+            STB_LANG_EXPAND_LHS();
+
+            Lang_TypeInfo_Typeinfo typinf = STB_LANG_OF_AST(ast->left, typeinfo);
+            ast->typeinfo = typinf;
+            if (ast->typeinfo.ptrnum != 0){
+                ast->typeinfo.ptrnum--;
+            }else if (ast->typeinfo.type == AST_TYPE_ARRAY){
+                ast->typeinfo = *(Lang_TypeInfo_Typeinfo*)(ast->typeinfo.data.array.elem_type);
+            }else {
+                STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "DerefError", "Could not dereference anything that's not a pointer or array");
+            };
+        )
+        STB_LANG_TYPEINFO_CASE(AST_ACCESS,
+            STB_LANG_EXPAND_LHS();
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
+
+            STB_LANG_FIND_DATA(checker->root_scope, STB_LANG_LHS(ast)->typeinfo.data.struct1.name,
+                STB_LANG_FIND_DATA(checker->root_scope, STB_LANG_LHS(ast)->typeinfo.data.struct1.name,
+                    Lang_Parser_AST *structdef = STB_LANG_LHS(STB_LANG_GET_AST(symnew.data.struct1.structdef));
+                    STB_LANG_ITERATE_LINKED_LIST(structdef, field, Lang_Parser_AST,
+                        if (field->type == AST_VAR){
+                            if (strcmp(field->value, ast->value) == 0){
+                                ast->typeinfo = field->typeinfo;
+                            }
+                        }
+                    )
+                )
+
+                Lang_TypeInfo_Typeinfo *typeinfo = &(ast->typeinfo);
+                STB_LANG_SET_SYMBOL(typeinfo->data.struct1.symbol, symnew);
+            )
+        )
+        STB_LANG_TYPEINFO_CASE(AST_EXPR,
+            STB_LANG_EXPAND_LHS();
+        )
     )
 )
 

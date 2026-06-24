@@ -11,6 +11,12 @@
 #define STB_CONCAT(a, b) STB_CONCAT_EVAL(a, b)
 #define STB_CONCAT3(a, b, c) STB_CONCAT3_EVAL(a, b, c)
 
+#define STB_LANG_TYPEINFO_FIELDS(...) __VA_ARGS__
+#define STB_LANG_TYPEINFO_INIT(...) __VA_ARGS__
+#define STB_LANG_TYPEINFO_SUFFIX(...) __VA_ARGS__
+
+#define STB_LANG_TYPEINFO_CASES(...) __VA_ARGS__
+
 
 #define STB_LANG_TYPEINFO_ERROR_MINOR(where, fil, type, ...) \
 if (fil > checker->files.datalen){ \
@@ -185,7 +191,7 @@ STB_CONCAT(STB_CONCAT3(dymarray_, CUR_TYPEINFO_NAME, _ScopeL), _add)(&(news->chi
 curscope = (STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL))__VA_ARGS__;
 
 
-#define STB_LANG_NEW_TYPEINFO(...) \
+#define STB_LANG_NEW_TYPEINFO(_fields, code_init, code_suffix, _cases) \
 typedef struct { \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *head; \
     STB_CONCAT(CUR_PARSER_NAME, _AST) *tail; \
@@ -197,6 +203,7 @@ typedef struct { \
     int entry_offset; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _File) file; \
     STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _File) files; \
+    _fields; \
 }CUR_TYPEINFO_NAME; \
 STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(STB_CONCAT(CUR_TYPEINFO_NAME, _ScopeL) paren, char *name){ \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Scope)* scope = malloc(sizeof(*scope)); \
@@ -249,31 +256,39 @@ STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol) STB_CONCAT(CUR_TYPEINFO_PREFIX, _symbol_f
     return (STB_CONCAT(CUR_TYPEINFO_NAME, _Symbol)){.typeinfo = -1}; \
 } \
 CUR_TYPEINFO_NAME *STB_CONCAT(CUR_TYPEINFO_PREFIX, _init)(CUR_PARSER_NAME *parser) { \
-    CUR_TYPEINFO_NAME *typeinfo = malloc(sizeof(*typeinfo)); \
-    typeinfo->cursor = 0; \
-    typeinfo->head = GetLinkedListHead((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST)); \
-    typeinfo->tail = typeinfo->head; \
-    typeinfo->root_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, NULL); \
-    typeinfo->current_scope = typeinfo->root_scope; \
-    typeinfo->entry_offset = 0; \
-    typeinfo->file = parser->file; \
-    typeinfo->files = parser->files; \
-    return typeinfo; \
+    CUR_TYPEINFO_NAME *checker = malloc(sizeof(*checker)); \
+    checker->cursor = 0; \
+    checker->head = GetLinkedListHead((*parser), STB_CONCAT(CUR_PARSER_NAME, _AST)); \
+    checker->tail = checker->head; \
+    checker->root_scope = STB_CONCAT(CUR_TYPEINFO_PREFIX, _scope_new)(NULL, NULL); \
+    checker->current_scope = checker->root_scope; \
+    checker->entry_offset = 0; \
+    checker->file = parser->file; \
+    checker->files = parser->files; \
+    code_init; \
+    return checker; \
 } \
 int a = 0; \
 void STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(CUR_TYPEINFO_NAME *checker, STB_CONCAT(CUR_PARSER_NAME, _AST) *ast) { \
     if (ast == NULL){ \
         stb_lang_error_major_global("ParserError", "Found NULL AST"); \
     } \
-    if (0){} __VA_ARGS__ else { \
+    if (0){} _cases else { \
         STB_LANG_TYPEINFO_ERROR_MINOR(ast->offset, ast->file, "TypecheckerError", "Could not typecheck ast with type '%d'", ast->type); \
     }; \
 } \
 char STB_CONCAT(CUR_TYPEINFO_PREFIX, _check)(CUR_TYPEINFO_NAME *checker) { \
-    if (checker->tail == NULL){return -1;} \
+    if (checker->tail == NULL){ \
+        code_suffix; \
+        return -1; \
+    } \
     STB_CONCAT(CUR_TYPEINFO_PREFIX, _check_ast)(checker, checker->tail); \
     checker->tail = (STB_CONCAT(CUR_PARSER_NAME, _AST)*)checker->tail->next; \
-    return (checker->tail == NULL) ? -1 : 0; \
+    if (checker->tail == NULL){ \
+        code_suffix; \
+        return -1; \
+    } \
+    return 0; \
 }
 
 #define STB_LANG_EXPAND_PARAMS() do {\
