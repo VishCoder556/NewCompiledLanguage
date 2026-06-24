@@ -40,17 +40,19 @@ STB_LANG_PARSER_ERROR_MINOR(old_token.offset, old_token.file, "ParserError", "Co
 #define STB_LANG_PARSER_SUFFIX(...) __VA_ARGS__
 #define STB_LANG_MATCH_BINDING_POWER(t, v) case t: return v;
 
+#define STB_LANG_PARSER_IN_BOUNDS() (parser->cursor + 1 < parser->tokens.datalen)
+
 #define STB_LANG_PARSER_UPDATE() token = parser->tokens.data[parser->cursor];
-#define STB_LANG_PARSER_ADVANCE(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _advance)(parser) == -1){STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
+#define STB_LANG_PARSER_ADVANCE(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _advance)(parser) == -1){;STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "OutOfBoundsError", "Went out of bounds to peek");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
 
 #define STB_LANG_PARSER_BACK(...) if (STB_CONCAT(CUR_PARSER_PREFIX, _back)(parser) == -1){STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "OutOfBoundsError", "Went out of bounds to back up");}else {__VA_ARGS__; STB_LANG_PARSER_UPDATE()};
 
 
-#define STB_LANG_MATCH_TOKEN(typ, ...) else if (token.type == typ) {match_token = token; STB_LANG_PARSER_ADVANCE();__VA_ARGS__;}
+#define STB_LANG_MATCH_TOKEN(typ, ...) else if (token.type == typ) {match_token = token; __VA_ARGS__;}
 #define STB_LANG_MATCH_VALUE(typ, val, ...) else if(token.type == typ) \
 { \
     if (strcmp(token.value, val) == 0){\
-        match_token = token; STB_LANG_PARSER_ADVANCE();__VA_ARGS__; \
+        STB_LANG_PARSER_ADVANCE();__VA_ARGS__; \
         break; \
     }; \
 break; \
@@ -228,7 +230,7 @@ exit: \
     return NULL; \
 } \
 STB_CONCAT(CUR_PARSER_NAME, _AST) *STB_CONCAT(CUR_PARSER_PREFIX, _parse_body_ast)(CUR_PARSER_NAME *parser) { \
-    if (parser->cursor >= parser->tokens.datalen) {goto exit;} \
+    if (parser->cursor + 1 >= parser->tokens.datalen) {return NULL;} \
     int Generic; \
     STB_CONCAT(CUR_TYPEINFO_NAME, _Typeinfo) TypeInfo; \
     STB_CONCAT(CUR_TOKENIZER_NAME, _Token) token = parser->tokens.data[parser->cursor]; \

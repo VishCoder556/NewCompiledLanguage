@@ -1,18 +1,11 @@
 #!include "examples/include/std.lang"
 #!scope.flat
+
 #!declaration.var.auto
+a = 5
+// ^ no need to include type: in auto declare mode
+#!declaration.var.manual
 
-struct Vector {
-    int x
-    char y
-    int z
-}
-
-struct Vector v
-v.x = 65
-v.y = cast(char, 200)
-v.z = 100
-
-v.y = cast(char, v.x + 32)
-printf("%d, %c, %d\n", v.x, v.y, v.z)
-return 0;
+int b = 10
+// ^ need to include type `int`: in manual mode
+return a + b;

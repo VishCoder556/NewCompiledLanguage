@@ -9,6 +9,10 @@ for file in tests/inputs/*; do
     echo "[INFO] Testing Example \""$base_name"\""
 
     ./exes/main $file
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}[ERROR] Compiler crashed${CLEAR}"
+        continue
+    fi
     output=$(./res/main.out 2>&1)
 
     expected=$(cat tests/expected/"$base_name".txt)

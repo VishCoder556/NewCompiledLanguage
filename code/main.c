@@ -269,7 +269,10 @@ STB_LANG_PARSER_SUFFIX(
 ),
 STB_LANG_PARSE_BODY(
     STB_LANG_IF_TOKEN(TOKEN_HASH,
-        STB_LANG_PARSER_MODE();
+        if (parser->scope_flat == 0){
+            STB_LANG_PARSER_MODE();
+        } 
+        // Otherwise, leave it to AST level in flat mode so that it's picked into the entry point
     )
 
     STB_LANG_IF_VALUE(TOKEN_ID, "struct",
@@ -346,13 +349,6 @@ STB_LANG_PARSE_BODY(
         if (parser->scope_flat == 1){
             AppendToLinkedList(parser->flat_scope, Lang_Parser_AST, *STB_LANG_PARSE_STATEMENT());
             STB_LANG_PARSER_UPDATE();
-            // if (token.type == TOKEN_NOT){
-            //     // STB_LANG_PARSE_STATEMENT_LIST skips the `#` if it finds it, so we have to manually go back
-            //     STB_LANG_PARSER_BACK();
-            // }
-            // return STB_LANG_AST(.type=AST_FUNCDEF, .typeinfo=-1, .value="main", .left=NULL, .right=STB_LANG_LINKED_LIST(stmnts));
-            //
-            // printf("Here, %d, %s!\n", token.type, token.value);
             return STB_LANG_PARSE_TOP();
         }
 
@@ -440,6 +436,7 @@ STB_LANG_PARSE_EXPR(
         STB_LANG_SAVE(thing2, match_token)
 
         if (strcmp(match_token.value, "cast") == 0){
+            STB_LANG_PARSER_ADVANCE();
             STB_LANG_PARSER_EXPECT(TOKEN_LP);
             STB_LANG_GET_TYPEINFO(typeinfo){
                 STB_LANG_PARSER_EXPECT(TOKEN_COMMA);
@@ -451,6 +448,7 @@ STB_LANG_PARSE_EXPR(
         }
 
         if (strcmp(match_token.value, "ref") == 0){
+            STB_LANG_PARSER_ADVANCE();
             STB_LANG_PARSER_EXPECT(TOKEN_LP);
             STB_LANG_GET_AST_EXPR(exp, 0);
             STB_LANG_PARSER_EXPECT(TOKEN_RP);
@@ -459,6 +457,7 @@ STB_LANG_PARSE_EXPR(
         }
 
         if (strcmp(match_token.value, "deref") == 0){
+            STB_LANG_PARSER_ADVANCE();
             STB_LANG_PARSER_EXPECT(TOKEN_LP);
             STB_LANG_GET_AST_EXPR(exp, 0);
             STB_LANG_PARSER_EXPECT(TOKEN_RP);
@@ -467,6 +466,10 @@ STB_LANG_PARSE_EXPR(
         }
 
         STB_LANG_SAVE(name, match_token)
+        if (!STB_LANG_PARSER_IN_BOUNDS()){
+            return STB_LANG_AST_LITERAL(AST_VAR, name);
+        }
+        STB_LANG_PARSER_ADVANCE();
         STB_LANG_IF_TOKEN(TOKEN_LP,
             STB_LANG_PARSE_EXPR_LIST(args, TOKEN_LP, TOKEN_COMMA, TOKEN_RP);
             left = STB_LANG_AST_FUNCALL(AST_FUNCALL, name, args)
@@ -476,14 +479,17 @@ STB_LANG_PARSE_EXPR(
         )
     )
     STB_LANG_MATCH_TOKEN(TOKEN_LP,  
+        STB_LANG_PARSER_ADVANCE();
         STB_LANG_GET_AST_EXPR(l, 2);
         STB_LANG_PARSER_EXPECT(TOKEN_RP);
         left = STB_LANG_AST(.type = AST_EXPR, .left = STB_LANG_AS_AST(l))
     )
     STB_LANG_MATCH_TOKEN(TOKEN_NUM,  
+        STB_LANG_PARSER_ADVANCE();
         left = STB_LANG_AST_LITERAL(AST_INT, match_token);
     )
     STB_LANG_MATCH_TOKEN(TOKEN_STRING,  
+        STB_LANG_PARSER_ADVANCE();
         left = STB_LANG_AST_LITERAL(AST_STRING, match_token);
     )
 skip:

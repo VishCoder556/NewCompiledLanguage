@@ -1,9 +1,11 @@
 #!include "examples/include/std.lang"
-int main(){
-    #!declaration.var.auto
-    a = 5
-    // ^ should work; declaration auto is on
-    #!declaration.var.manual
-    printf("%d\n", a)
-    return 0;
-}
+#!scope.flat
+
+#!declaration.var.auto
+a = 5
+// ^ no need to include type: in auto declare mode
+#!declaration.var.manual
+
+int b = 10
+// ^ need to include type `int`: in manual mode
+printf("%d\n", a+b);
