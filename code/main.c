@@ -320,7 +320,13 @@ STB_LANG_PARSE_BODY(
             STB_CONCAT(CUR_PARSER_NAME, _ASTList) params = (STB_CONCAT(CUR_PARSER_NAME, _ASTList)){0};
             InitLinkedList(params, STB_CONCAT(CUR_PARSER_NAME, _AST));
         if (token.type == TOKEN_LP){
+            int depth = 0;
+            int oldcursor = parser->cursor;
             STB_LANG_PARSE_CUSTOM_LIST(TOKEN_LP, TOKEN_COMMA, TOKEN_RP,
+                if (depth >= 100 && oldcursor == parser->cursor){
+                    STB_LANG_PARSER_ERROR_MINOR(token.offset, token.file, "FunctionError", "Could not parse parameter of function");
+                }
+                depth++; oldcursor = parser->cursor;
                 STB_LANG_GET_TYPEINFO(argt){
                     STB_LANG_IF_TOKEN(TOKEN_ID,
                         STB_CONCAT(CUR_PARSER_NAME, _AST) ast = (STB_CONCAT(CUR_PARSER_NAME, _AST)){.type=AST_VAR, .typeinfo=argt, .value=match_token.value, .offset=offset};
@@ -342,6 +348,7 @@ STB_LANG_PARSE_BODY(
                     )
                 }
             )
+
         }else {
             parser->cursor = initial_cursor;
             STB_LANG_PARSER_UPDATE();
@@ -739,6 +746,7 @@ STB_LANG_NEW_TYPEINFO(
             STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
         )
         STB_LANG_TYPEINFO_5CASES(AST_AND, AST_OR, AST_BAND, AST_BOR, AST_XOR,
+            STB_LANG_EXPAND_LHS();
             STB_LANG_EXPAND_RHS();
             STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
             STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));

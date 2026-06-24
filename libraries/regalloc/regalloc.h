@@ -78,11 +78,6 @@ STB_CONCAT(CUR_REGALLOC_NAME, _Reg) STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_regis
             return (STB_CONCAT(CUR_REGALLOC_NAME, _Reg))i; \
         } \
     } \
-    if (offset == -1) { \
-        stb_lang_error_major_global("RegisterError", "Could not allocate a register"); \
-    }else { \
-        STB_LANG_REGALLOC_ERROR_MINOR(regalloc->files, offset, file, "RegisterError", "Could not allocate a register"); \
-    } \
     return -1; \
 }; \
 char *STB_CONCAT(CUR_REGALLOC_PREFIX, _register_from_reg_inner)(STB_CONCAT(CUR_REGALLOC_NAME, _Reg) r, int size){ \
@@ -110,7 +105,7 @@ void STB_CONCAT(CUR_REGALLOC_PREFIX, _free_register)(STB_CONCAT(CUR_REGALLOC_NAM
 }; \
 STB_CONCAT(CUR_REGALLOC_NAME, _VirtualRegister) STB_CONCAT(CUR_REGALLOC_PREFIX, _virtual_reg_init)(CUR_REGALLOC_NAME *regalloc, char *virtual, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
     STB_CONCAT(CUR_REGALLOC_NAME, _VirtualRegister) vreg; \
-    STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, instr->offset, instr->file); \
+    STB_LANG_ALLOC_REGISTER(reg); \
     vreg.real = reg; \
     vreg.virtual = virtual; \
     STB_CONCAT(STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _VirtualRegister), _add)(regalloc->virtual_regs, vreg); \
@@ -135,7 +130,7 @@ STB_CONCAT(CUR_REGALLOC_NAME, _VirtualRegister) STB_CONCAT(CUR_REGALLOC_PREFIX, 
         }; \
     }; \
     STB_CONCAT(CUR_REGALLOC_NAME, _VirtualRegister) vreg; \
-    STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, instr->offset, instr->file); \
+    STB_LANG_ALLOC_REGISTER(reg); \
     vreg.real = reg; \
     vreg.virtual = virtual; \
     STB_CONCAT(STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _VirtualRegister), _add)(regalloc->virtual_regs, vreg); \
@@ -225,7 +220,18 @@ STB_LANG_REGALLOC_REGISTER_NAMES( \
 #define STB_LANG_REGALLOC_REGISTER_NAMES(...) __VA_ARGS__
 #define STB_LANG_REGALLOC_REGISTER_MATCH(reg, n8, n4, n2, n1) else if (r == reg){switch(size){case 8: return n8; case 4: return n4; case 2: return n2; case 1: return n1;};}
 
-#define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg; if (instr == NULL){reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, -1, -1);}else {reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, instr->offset, instr->file);}
+#define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg; \
+if (instr == NULL){ \
+    reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, -1, -1); \
+    if (reg == -1){ \
+        stb_lang_error_major_global("RegisterError", "Could not allocate a register"); \
+    } \
+}else { \
+    reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, instr->offset, instr->file); \
+    if (reg == -1){ \
+        STB_LANG_REGALLOC_ERROR_MINOR(regalloc->files, instr->offset, instr->file, "RegisterError", "Could not allocate a register"); \
+    } \
+}
 
 
 
