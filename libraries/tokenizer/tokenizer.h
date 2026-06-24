@@ -110,6 +110,17 @@ if (c == s[0]){ \
         STB_LANG_ADD_TOKEN(.type = chtok, .value=NULL); return 0; \
     }; \
 }
+#define STB_LANG_TOKEN_DOUBLE_CHAR_IF(s, stok) \
+if (c == s[0]){ \
+    STB_CONCAT(CUR_TOKENIZER_PREFIX, _advance)(tokenizer); \
+    c = tokenizer->file.contents[tokenizer->cursor]; \
+    if (c == s[1]){ \
+        STB_LANG_ADD_TOKEN(.type = stok, .value=NULL); goto skip; \
+    }else { \
+        tokenizer->cursor--; \
+        c = tokenizer->file.contents[tokenizer->cursor]; \
+    }; \
+}
 #define STB_LANG_TOKEN_COMMENT_LINE(str) \
 int _cur = tokenizer->cursor; \
 if (c == str[0]){ \

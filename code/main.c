@@ -59,7 +59,9 @@ STB_LANG_NEW_TOKENIZER(
         TOKEN_BOR,
         TOKEN_CARET,
         TOKEN_DOT,
-        TOKEN_HASH
+        TOKEN_HASH,
+        TOKEN_BSHR,
+        TOKEN_BSHL
     ),
     STB_LANG_SIMPLE_CASES(
         STB_LANG_TOKEN_CHAR('(', TOKEN_LP)
@@ -82,6 +84,8 @@ STB_LANG_NEW_TOKENIZER(
     STB_LANG_ALPHA(TOKEN_ID)
     STB_LANG_NUM(TOKEN_NUM)
     STB_LANG_STRING('"', TOKEN_STRING)
+    STB_LANG_TOKEN_DOUBLE_CHAR_IF("<<", TOKEN_BSHL)
+    STB_LANG_TOKEN_DOUBLE_CHAR_IF(">>", TOKEN_BSHR)
     STB_LANG_TOKEN_DOUBLE_CHAR(">=", TOKEN_GTE, TOKEN_GT)
     STB_LANG_TOKEN_DOUBLE_CHAR("<=", TOKEN_LTE, TOKEN_LT)
     STB_LANG_TOKEN_DOUBLE_CHAR("==", TOKEN_DEQ, TOKEN_EQ)
@@ -203,6 +207,11 @@ STB_LANG_BINDING_POWER(
     STB_LANG_MATCH_BINDING_POWER(TOKEN_GTE, 6)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_DEQ, 6)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_NEQ, 6)
+
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_BSHL, 8)
+    STB_LANG_MATCH_BINDING_POWER(TOKEN_BSHR, 8)
+
+
     STB_LANG_MATCH_BINDING_POWER(TOKEN_ADD, 10)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_SUB, 10)
     STB_LANG_MATCH_BINDING_POWER(TOKEN_MUL, 20)
@@ -249,7 +258,9 @@ STB_LANG_ASTS(
     AST_INDEX,
     AST_STRUCT,
     AST_ACCESS,
-    AST_MODE
+    AST_MODE,
+    AST_BSHL,
+    AST_BSHR
 ),
 STB_LANG_PARSER_FIELDS(
     int scope_flat;
@@ -510,9 +521,11 @@ skip:
         STB_LANG_TOKEN_MATCH_AST(TOKEN_AND, AST_AND)
         STB_LANG_TOKEN_MATCH_AST(TOKEN_BAND, AST_BAND)
         STB_LANG_TOKEN_MATCH_AST(TOKEN_CARET, AST_XOR)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_BSHL, AST_BSHL)
+        STB_LANG_TOKEN_MATCH_AST(TOKEN_BSHR, AST_BSHR)
         STB_LANG_TOKEN_MATCH_AST_CUSTOM(TOKEN_LSB, AST_INDEX,
             STB_LANG_PARSER_ADVANCE();
-            STB_LANG_GET_AST_EXPR(new, 10);
+            STB_LANG_GET_AST_EXPR(new, 0);
             parent->right = STB_LANG_AS_AST(new);
             STB_LANG_PARSER_EXPECT(TOKEN_RSB);
         )
@@ -560,6 +573,7 @@ STB_LANG_PARSE_TYPEINFO(
         STB_LANG_PARSER_ADVANCE();
     )
     STB_LANG_IF_TOKEN(TOKEN_LSB,
+start_parse_bracket:
         STB_LANG_PARSER_EXPECT(TOKEN_LSB);
         STB_LANG_SAVE(num, token)
         STB_LANG_PARSER_EXPECT(TOKEN_NUM);
@@ -568,6 +582,10 @@ STB_LANG_PARSE_TYPEINFO(
         typeinf.data.array.elem_type = malloc(sizeof(Lang_TypeInfo_Typeinfo));
         *(Lang_TypeInfo_Typeinfo*)typeinf.data.array.elem_type = typeinfo;
         STB_LANG_PARSER_EXPECT(TOKEN_RSB);
+        if (token.type == TOKEN_LSB){
+            typeinfo = typeinf;
+            goto start_parse_bracket;
+        }
         return typeinf;
     )
     return typeinfo;
@@ -725,6 +743,11 @@ STB_LANG_NEW_TYPEINFO(
             STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
             STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
         )
+        STB_LANG_TYPEINFO_2CASES(AST_BSHL, AST_BSHR,
+            STB_LANG_EXPAND_RHS();
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+            STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
+        )
         STB_LANG_TYPEINFO_CASE(AST_FUNCALL,
             STB_LANG_EXPAND_ARGS();
             STB_LANG_FIND_FUNCTION(checker->root_scope, ast->value, 
@@ -846,7 +869,9 @@ STB_LANG_NEW_IR(
         IR_XOR,
         IR_ADDR,
         IR_LOAD,
-        IR_STORE
+        IR_STORE,
+        IR_BSHL,
+        IR_BSHR
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDECL,
@@ -1043,6 +1068,16 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
             STB_LANG_IR_EMIT(IR_BAND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
+        STB_LANG_IR_CASE(AST_BSHL,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_BSHL, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
+        STB_LANG_IR_CASE(AST_BSHR,
+            STB_LANG_IR_NEW_TEMP(temp_reg);
+            STB_LANG_IR_EMIT(IR_BSHR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
+            return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
+        )
         STB_LANG_IR_CASE(AST_AND,
             STB_LANG_IR_NEW_TEMP(temp_reg);
             STB_LANG_IR_EMIT(IR_AND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
@@ -1186,10 +1221,8 @@ STB_LANG_NEW_REGALLOC(
             STB_LANG_SAVE_REG(phys[0], {
                 STB_LANG_SAVE_REG(phys[1]);
             });
-            STB_LANG_EXPAND_OPERAND(right, IR_REG)
         )
         STB_LANG_REGALLOC_CASE(IR_JUMP_IF_FALSE,
-            STB_LANG_EXPAND_OPERAND(right, IR_REG)
         )
         STB_LANG_REGALLOC_CASE(IR_LABEL,
         )
@@ -1215,19 +1248,15 @@ STB_LANG_NEW_REGALLOC(
                 STB_LANG_SAVE_REG(phys[1]);
             });
         )
-        STB_LANG_REGALLOC_CASE(IR_XOR,
+        STB_LANG_REGALLOC_3CASES(IR_XOR, IR_BSHL, IR_BSHR,
             STB_LANG_SAVE_REG(phys[0], {
                 STB_LANG_SAVE_REG(phys[1]);
             });
         )
         STB_LANG_REGALLOC_CASE(IR_ADDR,
-            STB_LANG_EXPAND_OPERAND(dest, IR_REG)
         )
         STB_LANG_REGALLOC_CASE(IR_LOAD,
             STB_LANG_SAVE_REG(phys[0]);
-            STB_LANG_EXPAND_OPERAND(dest, IR_REG)
-            STB_LANG_EXPAND_OPERAND(left, IR_REG)
-            STB_LANG_EXPAND_OPERAND(right, IR_REG)
         )
         STB_LANG_REGALLOC_CASE(IR_MOD,
             STB_CONCAT(CUR_REGALLOC_NAME, _Reg) right;
@@ -1252,7 +1281,6 @@ STB_LANG_NEW_REGALLOC(
         )
 
         STB_LANG_REGALLOC_CASE(IR_RET,
-            STB_LANG_EXPAND_OPERAND(left, IR_REG)
         )
 
         STB_LANG_REGALLOC_CASE(IR_JUMP,
@@ -1479,6 +1507,12 @@ STB_LANG_NEW_CODEGEN(
             {
                 STB_LANG_EMIT_CODE("\tmsub %s, %s, %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), tmp, right, left);
             }
+        )
+        STB_LANG_CODEGEN_CASE(IR_BSHL,
+            STB_LANG_ARM_BINARY("lsl")
+        )
+        STB_LANG_CODEGEN_CASE(IR_BSHR,
+            STB_LANG_ARM_BINARY("lsr")
         )
         STB_LANG_CODEGEN_CASE(IR_BOR,
             STB_LANG_ARM_BINARY("orr")
