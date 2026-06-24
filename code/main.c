@@ -709,6 +709,7 @@ STB_LANG_NEW_TYPEINFO(
             STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_TYPEINFO(.type=AST_TYPE_STRING, .ptrnum=0));
         )
         STB_LANG_TYPEINFO_6CASES(AST_LT, AST_LTE, AST_GT, AST_GTE, AST_EQ, AST_NEQ,
+            STB_LANG_EXPAND_LHS();
             STB_LANG_EXPAND_RHS();
             STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
             STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
@@ -881,10 +882,15 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
                 STB_LANG_IR_NEW_TEMP(addr_reg);
                 STB_LANG_IR_NEW_TEMP(offset_reg);
 
-                char str[32]; snprintf(str, 32, "%d", STB_LANG_LOOKUP_SIZE(ir->root_scope, &STB_LANG_LHS(ast)->typeinfo));
+                int size = STB_LANG_LOOKUP_SIZE(ir->root_scope, &STB_LANG_LHS(ast)->typeinfo);
+                char str[32]; snprintf(str, 32, "%d", size);
                 // a[0] = 5
                 STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_OPERAND(IR_REG, offset_reg), STB_LANG_IR_RHS(STB_LANG_LHS(ast)), STB_LANG_IR_OPERAND(IR_INT, strdup(str)));
-                STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
+                if (STB_LANG_LHS(STB_LANG_LHS(ast))->typeinfo.ptrnum == 0){
+                    STB_LANG_IR_EMIT(IR_ADDR, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
+                }else {
+                    STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_LHS(STB_LANG_LHS(ast)), NULL);
+                }
                 STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_OPERAND(IR_REG, offset_reg));
                 STB_LANG_IR_EMIT(IR_STORE, STB_LANG_IR_OPERAND(IR_REG, addr_reg), STB_LANG_IR_RHS(ast), NULL, .typeinfo=STB_LANG_LHS(ast)->typeinfo);
             }else if (STB_LANG_LHS(ast)->type == AST_ACCESS) {
@@ -1004,82 +1010,82 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
         )
         STB_LANG_IR_CASE(AST_ADD,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_SUB,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_SUB, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_SUB, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_MUL,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_MUL, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_DIV,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_DIV, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_DIV, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_MODULO,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_MOD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_MOD, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_BOR,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_BOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_BOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_BAND,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_BAND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_BAND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_AND,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_AND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_AND, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_OR,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_OR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_OR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_XOR,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_XOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_XOR, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_LT,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_LT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_LT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_LTE,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_LTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_LTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_GT,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_GT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_GT, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_GTE,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_GTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_GTE, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_EQ,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_EQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_EQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_NEQ,
             STB_LANG_IR_NEW_TEMP(temp_reg);
-            STB_LANG_IR_EMIT(IR_NEQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast));
+            STB_LANG_IR_EMIT(IR_NEQ, STB_LANG_IR_AS_TEMP(IR_REG, temp_reg), STB_LANG_IR_LHS(ast), STB_LANG_IR_RHS(ast), .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, temp_reg)
         )
         STB_LANG_IR_CASE(AST_IF,
@@ -1120,6 +1126,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
             return STB_LANG_IR_AS_TEMP(IR_REG, dest);
         )
         STB_LANG_IR_CASE(AST_INDEX,
+            // printf("%d, %d = %d, %d\n", typinf.type, typinf.ptrnum, ast->typeinfo.type, ast->typeinfo.ptrnum);
             STB_LANG_IR_NEW_TEMP(dest);
             STB_LANG_IR_NEW_TEMP(temp_reg);
             STB_LANG_IR_NEW_TEMP(temp2);
@@ -1137,7 +1144,7 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
                 STB_LANG_IR_EMIT(IR_ASSIGN, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_LHS(ast), NULL);
             }
             STB_LANG_IR_EMIT(IR_ADD, STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_OPERAND(IR_REG, temp2), STB_LANG_IR_OPERAND(IR_REG, temp_reg));
-            STB_LANG_IR_EMIT(IR_LOAD, STB_LANG_IR_AS_TEMP(IR_REG, dest), STB_LANG_IR_OPERAND(IR_REG, temp2), NULL);
+            STB_LANG_IR_EMIT(IR_LOAD, STB_LANG_IR_AS_TEMP(IR_REG, dest), STB_LANG_IR_OPERAND(IR_REG, temp2), NULL, .typeinfo=ast->typeinfo);
             return STB_LANG_IR_AS_TEMP(IR_REG, dest);
         )
         STB_LANG_IR_CASE(AST_WHILE,
@@ -1276,7 +1283,7 @@ if (right != NULL) { \
             int n = atoi(instr->dest->value + 4); \
             STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, n * 8); \
         }else if (right->value[0] == 'v'){ \
-            STB_LANG_EMIT_CODE("\tmov %s, x0\n", leftr); \
+            STB_LANG_EMIT_CODE("\tmov %s, %c0\n", leftr, size==8?'x':'w'); \
         }else { \
             STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_REGISTER(right->phys, size)); \
         } \
@@ -1300,14 +1307,15 @@ if (instr->phys[1] != -1){ \
 
 
 #define STB_LANG_ARM_COMPARISON(op) \
-STB_LANG_ARM_MOVE(8, instr->left, STB_LANG_REGISTER(instr->phys[0], 8)); \
+int size = STB_LANG_LOOKUP_SIZE(gen->root_scope, &instr->typeinfo); \
+STB_LANG_ARM_MOVE(size, instr->left, STB_LANG_REGISTER(instr->phys[0], size)); \
 if (instr->phys[1] != -1){ \
-    STB_LANG_ARM_MOVE(8, instr->right, STB_LANG_REGISTER(instr->phys[1], 8)); \
-    STB_LANG_EMIT_CODE("\tcmp %s, %s\n", STB_LANG_REGISTER(instr->phys[0], 8), STB_LANG_REGISTER(instr->phys[1], 8)); \
+    STB_LANG_ARM_MOVE(8, instr->right, STB_LANG_REGISTER(instr->phys[1], size)); \
+    STB_LANG_EMIT_CODE("\tcmp %s, %s\n", STB_LANG_REGISTER(instr->phys[0], size), STB_LANG_REGISTER(instr->phys[1], size)); \
 }else { \
-    STB_LANG_EMIT_CODE("\tcmp %s, #%s\n", STB_LANG_REGISTER(instr->phys[0], 8), instr->right->value); \
+    STB_LANG_EMIT_CODE("\tcmp %s, #%s\n", STB_LANG_REGISTER(instr->phys[0], size), instr->right->value); \
 } \
-STB_LANG_EMIT_CODE("\tcset %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), op);
+STB_LANG_EMIT_CODE("\tcset %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, size), op);
 
 
 #define CUR_CODEGEN_NAME Lang_CodeGen
@@ -1369,13 +1377,13 @@ STB_LANG_NEW_CODEGEN(
             }
         )
         STB_LANG_CODEGEN_CASE(IR_LOAD,
-            char *dest = STB_LANG_REGISTER(instr->dest->phys, 8);
+            int size = STB_LANG_LOOKUP_SIZE(gen->root_scope, &instr->typeinfo);
+            if (size == -1 || size == 0) size = 8;
+            char *dest = STB_LANG_REGISTER(instr->dest->phys, size);
             char *tmp = STB_LANG_REGISTER(instr->phys[0], 8);
             STB_LANG_ARM_MOVE(8, instr->left, tmp);
             
-            int val_size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->left->value);
-            
-            if (val_size == 1) {
+            if (size == 1) {
                 STB_LANG_EMIT_CODE("\tldrb %s, [%s]\n", dest, tmp);
             } else {
                 STB_LANG_EMIT_CODE("\tldr %s, [%s]\n", dest, tmp);
@@ -1404,7 +1412,7 @@ STB_LANG_NEW_CODEGEN(
                 int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value);
 
                 if (instr->left != NULL){
-                    STB_LANG_ARM_MOVE(8, instr->left, STB_LANG_REGISTER(instr->phys[0], size))
+                    STB_LANG_ARM_MOVE(size, instr->left, STB_LANG_REGISTER(instr->phys[0], size))
                 }
                 if (offset == 0){
                     STB_LANG_EMIT_CODE("\tstr %s, [sp]\n", STB_LANG_REGISTER(instr->phys[0], size));

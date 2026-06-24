@@ -1,3 +1,6 @@
 ptr<int> malloc(int size);
 void exit(int return);
 void printf(string fmt, ...)
+int strlen(string fmt)
+char getchar()
+void putchar(char a)
