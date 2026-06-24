@@ -1,4 +1,5 @@
 // Simple TAC IR
+
 #ifndef STB_LANG_IR_H
 #define STB_LANG_IR_H
 

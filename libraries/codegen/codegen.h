@@ -1,3 +1,5 @@
+// Simple `IR -> other code` generator library
+
 #ifndef STB_LANG_CODEGEN_H
 #define STB_LANG_CODEGEN_H
 
