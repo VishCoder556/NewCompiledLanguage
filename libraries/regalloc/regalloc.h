@@ -220,6 +220,13 @@ STB_LANG_REGALLOC_REGISTER_NAMES( \
 #define STB_LANG_REGALLOC_REGISTER_NAMES(...) __VA_ARGS__
 #define STB_LANG_REGALLOC_REGISTER_MATCH(reg, n8, n4, n2, n1) else if (r == reg){switch(size){case 8: return n8; case 4: return n4; case 2: return n2; case 1: return n1;};}
 
+
+// STB_LANG_ITERATE(STB_LANG_CURRENT_SCOPE()->symbols, Lang_TypeInfo_Symbol,
+//     if (iter.kind == STB_LANG_SYMBOL_VARIABLE){
+//         iter.data.variable.offset += allocated;
+//     };
+// );
+
 #define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg; \
 if (instr == NULL){ \
     reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, -1, -1); \
@@ -229,10 +236,10 @@ if (instr == NULL){ \
 }else { \
     reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, instr->offset, instr->file); \
     if (reg == -1){ \
-        STB_LANG_REGALLOC_ERROR_MINOR(regalloc->files, instr->offset, instr->file, "RegisterError", "Could not allocate a register"); \
     } \
 }
 
+// STB_LANG_REGALLOC_ERROR_MINOR(regalloc->files, instr->offset, instr->file, "RegisterError", "Could not allocate a register"); \
 
 
 #define STB_LANG_REGISTER(r, size) STB_CONCAT(CUR_REGALLOC_PREFIX, _register_from_reg)(gen->files, instr->file, instr->offset, r, size)

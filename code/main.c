@@ -847,6 +847,7 @@ STB_LANG_NEW_IR(
         IR_MEM
     ),
     STB_LANG_IR_INSTRS(
+        IR_EXTERN,
         IR_FUNCDEF_BEGIN,
         IR_FUNCDEF_END,
         IR_ASSIGN,
@@ -883,6 +884,7 @@ STB_LANG_NEW_IR(
     ),
     STB_LANG_IR_CASES(
         STB_LANG_IR_CASE(AST_FUNCDECL,
+            STB_LANG_IR_EMIT(IR_EXTERN, STB_LANG_IR_OPERAND(IR_VAR, ast->value), NULL, NULL);
             // Skip
         )
         STB_LANG_IR_CASE(AST_MODE,
@@ -1215,9 +1217,34 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
 #define CUR_REGALLOC_NAME Lang_RegAlloc
 #define CUR_REGALLOC_PREFIX lang_regalloc
 STB_LANG_NEW_REGALLOC(
-    STB_LANG_ARM_REGISTERS(),
-    STB_LANG_ARM_REGISTER_MAPS(),
+    // STB_LANG_REGALLOC_REGISTERS(
+    //     REG_X9, REG_X10, REG_X11, REG_X12, REG_X13, REG_X14, REG_X15
+    // ),
+    // STB_LANG_REGALLOC_REGISTER_NAMES(
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X9, "x9", "w9", "w9", "w9")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X10, "x10", "w10", "w10", "w10")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X11, "x11", "w11", "w11", "w11")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X12, "x12", "w12", "w12", "w12")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X13, "x13", "w13", "w13", "w13")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X14, "x14", "w14", "w14", "w14")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X15, "x15", "w15", "w15", "w15")
+    //
+    // ),
+    STB_LANG_REGALLOC_REGISTERS(
+        REG_R8, REG_R9, REG_R10, REG_R11
+        // Yes, r8 and r9 are technically not available as scratch registers, but we're using them as it for now for registers space
+        // TODO: distinguish callee and caller registers (in regalloc phase)
+    ),
+    STB_LANG_REGALLOC_REGISTER_NAMES(
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R8, "r8", "r8", "r8", "r8")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R9, "r9", "r9", "r9", "r9")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R10, "r10", "r10", "r10", "r10")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R11, "r11", "r11", "r11", "r11")
+
+    ),
     STB_LANG_REGALLOC_LIST(
+        STB_LANG_REGALLOC_CASE(IR_EXTERN,
+        )
         STB_LANG_REGALLOC_CASE(IR_FUNCDEF_BEGIN,
         )
         STB_LANG_REGALLOC_CASE(IR_FUNCDEF_END,
@@ -1297,300 +1324,27 @@ STB_LANG_NEW_REGALLOC(
     IR_REG
 )
 
-#define STB_LANG_ARM_MOVE(size, right, ...) {\
-if (right != NULL) { \
-    char *leftr = __VA_ARGS__; \
-    if (leftr[0] == 't'){ \
-        leftr = STB_LANG_REGISTER(instr->dest->phys, 8); \
-    } \
-    if (right->type == IR_INT) { \
-        STB_LANG_EMIT_CODE("\tmov %s, #%s\n", leftr, right->value); \
-    }else if(right->type == IR_VAR){ \
-        int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, right->value); \
-        if (newoffset == 0){ \
-            STB_LANG_EMIT_CODE("\tldr %s, [sp]\n", leftr); \
-        }else { \
-            STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, newoffset); \
-        } \
-    }else if (right->type == IR_REG){ \
-        if (right->value[0] == 'a'){ \
-            STB_LANG_EMIT_CODE("\tmov %s, x%d\n", leftr, atoi(right->value + 1)); \
-        }else if (right->value[0] == '.'){ \
-            int n = atoi(instr->dest->value + 4); \
-            STB_LANG_EMIT_CODE("\tldr %s, [sp, #%d]\n", leftr, n * 8); \
-        }else if (right->value[0] == 'v'){ \
-            STB_LANG_EMIT_CODE("\tmov %s, %c0\n", leftr, size==8?'x':'w'); \
-        }else { \
-            STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_REGISTER(right->phys, size)); \
-        } \
-    }else if (right->type == IR_MEM){ \
-        STB_LANG_EMIT_CODE("\tadrp %s, mem_%ld@PAGE\n", leftr, (long)right->value); \
-        STB_LANG_EMIT_CODE("\tadd %s, %s, mem_%ld@PAGEOFF\n", leftr, leftr, (long)right->value); \
-    } \
-} \
-}
-
-
-
-#define STB_LANG_ARM_BINARY(op) \
-STB_LANG_ARM_MOVE(8, instr->left, STB_LANG_REGISTER(instr->phys[0], 8)); \
-if (instr->phys[1] != -1){ \
-    STB_LANG_ARM_MOVE(8, instr->right, STB_LANG_REGISTER(instr->phys[1], 8)); \
-    STB_LANG_EMIT_CODE("\t%s %s, %s, %s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys[0], 8), STB_LANG_REGISTER(instr->phys[1], 8)); \
-}else { \
-    STB_LANG_EMIT_CODE("\t%s %s, %s, #%s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), STB_LANG_REGISTER(instr->phys[0], 8), instr->right->value); \
-}
-
-
-#define STB_LANG_ARM_COMPARISON(op) \
-int size = STB_LANG_LOOKUP_SIZE(gen->root_scope, &instr->typeinfo); \
-STB_LANG_ARM_MOVE(size, instr->left, STB_LANG_REGISTER(instr->phys[0], size)); \
-if (instr->phys[1] != -1){ \
-    STB_LANG_ARM_MOVE(8, instr->right, STB_LANG_REGISTER(instr->phys[1], size)); \
-    STB_LANG_EMIT_CODE("\tcmp %s, %s\n", STB_LANG_REGISTER(instr->phys[0], size), STB_LANG_REGISTER(instr->phys[1], size)); \
-}else { \
-    STB_LANG_EMIT_CODE("\tcmp %s, #%s\n", STB_LANG_REGISTER(instr->phys[0], size), instr->right->value); \
-} \
-STB_LANG_EMIT_CODE("\tcset %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, size), op);
-
 
 #define CUR_CODEGEN_NAME Lang_CodeGen
 #define CUR_CODEGEN_PREFIX lang_codegen
-STB_LANG_NEW_CODEGEN(
-    STB_LANG_CODEGEN_PREFIX(
-        STB_LANG_EMIT_CODE("%s\n", ".global _main");
-        STB_LANG_EMIT_CODE("%s\n", ".align 2");
-    ),
-    STB_LANG_CODEGEN_SUFFIX(
-        STB_LANG_EMIT_CODE(".data\n");
-        STB_LANG_EMIT_CODE(".align 3\n");
-        STB_LANG_ITERATE(gen->symbols, Lang_IR_Symbol, 
-// This looks wrong, but there are variables idx and iter used in the iterate function
-// This is not meant to be used that seriously, so take it with a grain of salt.
-            STB_LANG_EMIT_CODE("mem_%d: .asciz \"%s\\0\"\n", idx, iter.data);
-        )
-    ),
-    STB_LANG_CODEGEN_LIST(
-        STB_LANG_CODEGEN_CASE(IR_FUNCDEF_BEGIN,
-            STB_LANG_EMIT_CODE("_%s:\n", instr->dest->value);
-            STB_LANG_EMIT_CODE("\tstp x29, x30, [sp, #-16]!\n");
-            STB_LANG_EMIT_CODE("\tmov x29, sp\n");
+// #include "arm.c"
+#include "x86_64.c"
 
-            // STB_LANG_FUNCTION_ALLOCATE(gen, 8);
-            int offset = 16;
-            STB_LANG_GO_TO_FUNC(instr->dest->value);
-            STB_LANG_ITERATE(STB_LANG_CURRENT_SCOPE()->symbols, Lang_TypeInfo_Symbol,
-                if (iter.kind == STB_LANG_SYMBOL_VARIABLE){
-                    offset = iter.data.variable.offset;
-                };
-            );
-            STB_LANG_EMIT_CODE("\tsub sp, sp, #%d\n", (offset + 15 + 16) & ~15);
-        )
-        STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
-            STB_LANG_EMIT_CODE("\tmov sp, x29\n");
-            STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n");
-            STB_LANG_EMIT_CODE("\tret\n");
-        )
-        STB_LANG_CODEGEN_CASE(IR_RET,
-            STB_LANG_ARM_MOVE(8, instr->left, "x0")
-
-            STB_LANG_EMIT_CODE("\tmov sp, x29\n");
-            STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n");
-            STB_LANG_EMIT_CODE("\tret\n");
-        )
-        STB_LANG_CODEGEN_CASE(IR_LABEL,
-            STB_LANG_EMIT_CODE(".L_label_%s:\n", instr->dest->value)
-        )
-        STB_LANG_CODEGEN_CASE(IR_ADDR,
-            char *dest = STB_LANG_REGISTER(instr->dest->phys, 8);
-            if (instr->left->type == IR_VAR){
-                int newoffset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->left->value);
-                if (newoffset == 0) {
-                    STB_LANG_EMIT_CODE("\tmov %s, sp\n", dest);
-                } else {
-                    STB_LANG_EMIT_CODE("\tadd %s, sp, #%d\n", dest, newoffset);
-                }
-            }
-        )
-        STB_LANG_CODEGEN_CASE(IR_LOAD,
-            int size = STB_LANG_LOOKUP_SIZE(gen->root_scope, &instr->typeinfo);
-            if (size == -1 || size == 0) size = 8;
-            char *dest = STB_LANG_REGISTER(instr->dest->phys, size);
-            char *tmp = STB_LANG_REGISTER(instr->phys[0], 8);
-            STB_LANG_ARM_MOVE(8, instr->left, tmp);
-            
-            if (size == 1) {
-                STB_LANG_EMIT_CODE("\tldrb %s, [%s]\n", dest, tmp);
-            } else {
-                STB_LANG_EMIT_CODE("\tldr %s, [%s]\n", dest, tmp);
-            }
-        )
-        STB_LANG_CODEGEN_CASE(IR_STORE,
-            int size = STB_LANG_LOOKUP_SIZE(gen->root_scope, &instr->typeinfo);
-
-            char *val_reg = STB_LANG_REGISTER(instr->phys[0], size);
-            STB_LANG_ARM_MOVE(size, instr->left, val_reg);
-
-            char *addr_reg = STB_LANG_REGISTER(instr->phys[1], 8);
-            STB_LANG_ARM_MOVE(8, instr->dest, addr_reg);
-
-
-            if (size == 1) {
-                STB_LANG_EMIT_CODE("\tstrb %s, [%s]\n", val_reg, addr_reg);
-            }else {
-                STB_LANG_EMIT_CODE("\tstr %s, [%s]\n", val_reg, addr_reg);
-            }
-        )
-        STB_LANG_CODEGEN_2CASES(IR_ASSIGN, IR_DECL,
-            // TODO: merge this entirely with STB_LANG_ARM_MOVE
-            ;if (instr->dest->type == IR_VAR){
-                int size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->dest->value);
-                int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value);
-
-                if (instr->left != NULL){
-                    STB_LANG_ARM_MOVE(size, instr->left, STB_LANG_REGISTER(instr->phys[0], size))
-                }
-                if (offset == 0){
-                    STB_LANG_EMIT_CODE("\tstr %s, [sp]\n", STB_LANG_REGISTER(instr->phys[0], size));
-                }else {
-                    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys[0], size), offset);
-                }
-            }else if (instr->dest->type == IR_REG){
-                char string[32];
-                if (instr->dest->value[0] == 'a'){
-                    snprintf(string, 32, "x%d", atoi(instr->dest->value + 1));
-                    STB_LANG_ARM_MOVE(8, instr->left, string)
-                }else if (instr->dest->value[0] == 't'){
-                    snprintf(string, 32, "%s", instr->dest->value);
-                    STB_LANG_ARM_MOVE(8, instr->left, string)
-                }else if (instr->dest->value[0] == '.'){
-                    int n = atoi(instr->dest->value + 4);
-                    STB_LANG_ARM_MOVE(8, instr->left, STB_LANG_REGISTER(instr->phys[0], 8))
-                    STB_LANG_EMIT_CODE("\tstr %s, [sp, #%d]\n", STB_LANG_REGISTER(instr->phys[0], 8), n*8);
-                }
-            };
-        )
-        STB_LANG_CODEGEN_CASE(IR_PUSH,
-            STB_LANG_ARM_MOVE(8, instr->left, STB_LANG_REGISTER(instr->phys[0], 8));
-            STB_LANG_EMIT_CODE("\tstr %s, [sp, #-16]!\n", STB_LANG_REGISTER(instr->phys[0], 8));
-        )
-        STB_LANG_CODEGEN_CASE(IR_POP,
-            STB_LANG_EMIT_CODE("\tldr %s, [sp], #16\n", instr->dest->value);
-        )
-        STB_LANG_CODEGEN_CASE(IR_JUMP_IF_FALSE,
-            STB_LANG_EMIT_CODE("\tcbz %s, .L_label_%s\n", 
-                STB_LANG_REGISTER(instr->right->phys, 8), 
-                instr->dest->value
-            );
-        )
-        STB_LANG_CODEGEN_CASE(IR_CALL,
-            STB_LANG_EMIT_CODE("\tbl _%s\n", instr->dest->value);
-        )
-        STB_LANG_CODEGEN_CASE(IR_JUMP,
-            STB_LANG_EMIT_CODE("\tb .L_label_%s\n", instr->dest->value);
-        )
-        STB_LANG_CODEGEN_CASE(IR_ADD,
-            STB_LANG_ARM_BINARY("add")
-        )
-        STB_LANG_CODEGEN_CASE(IR_SUB,
-            STB_LANG_ARM_BINARY("sub")
-        )
-        STB_LANG_CODEGEN_CASE(IR_MUL,
-            STB_LANG_ARM_BINARY("mul")
-        )
-        STB_LANG_CODEGEN_CASE(IR_DIV,
-            STB_LANG_ARM_BINARY("sdiv")
-        )
-        STB_LANG_CODEGEN_CASE(IR_MOD,
-            char *left = STB_LANG_REGISTER(instr->phys[0], 8);
-            char *right = STB_LANG_REGISTER(instr->phys[1], 8);
-            char *tmp = STB_LANG_REGISTER(instr->phys[2], 8);
-
-
-            STB_LANG_ARM_MOVE(8, instr->left, left);
-            STB_LANG_ARM_MOVE(8, instr->right, right);
-
-            ;
-            STB_LANG_EMIT_CODE("\tsdiv %s, %s, %s\n", tmp, left, right);
-            {
-                STB_LANG_EMIT_CODE("\tmsub %s, %s, %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), tmp, right, left);
-            }
-        )
-        STB_LANG_CODEGEN_CASE(IR_BSHL,
-            STB_LANG_ARM_BINARY("lsl")
-        )
-        STB_LANG_CODEGEN_CASE(IR_BSHR,
-            STB_LANG_ARM_BINARY("lsr")
-        )
-        STB_LANG_CODEGEN_CASE(IR_BOR,
-            STB_LANG_ARM_BINARY("orr")
-        )
-        STB_LANG_CODEGEN_CASE(IR_BAND,
-            STB_LANG_ARM_BINARY("and")
-        )
-        STB_LANG_CODEGEN_CASE(IR_XOR,
-            STB_LANG_ARM_BINARY("eor")
-        )
-        STB_LANG_CODEGEN_CASE(IR_AND,
-            char *left = STB_LANG_REGISTER(instr->phys[0], 8);
-            char *right = STB_LANG_REGISTER(instr->phys[1], 8);
-            STB_LANG_ARM_MOVE(8, instr->left, left);
-            STB_LANG_ARM_MOVE(8, instr->right, right);
-
-            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", left);
-            STB_LANG_EMIT_CODE("\tcset %s, ne\n", left);
-
-
-            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", right);
-            STB_LANG_EMIT_CODE("\tcset %s, ne\n", right);
-
-            STB_LANG_EMIT_CODE("\tand %s, %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), left, right);
-        )
-        STB_LANG_CODEGEN_CASE(IR_OR,
-            char *left = STB_LANG_REGISTER(instr->phys[0], 8);
-            char *right = STB_LANG_REGISTER(instr->phys[1], 8);
-            STB_LANG_ARM_MOVE(8, instr->left, left);
-            STB_LANG_ARM_MOVE(8, instr->right, right);
-
-            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", left);
-            STB_LANG_EMIT_CODE("\tcset %s, ne\n", left);
-
-
-            STB_LANG_EMIT_CODE("\tcmp %s, #0\n", right);
-            STB_LANG_EMIT_CODE("\tcset %s, ne\n", right);
-
-            STB_LANG_EMIT_CODE("\torr %s, %s, %s\n", STB_LANG_REGISTER(instr->dest->phys, 8), left, right);
-        )
-        STB_LANG_CODEGEN_CASE(IR_LT,
-            STB_LANG_ARM_COMPARISON("lt")
-        )
-        STB_LANG_CODEGEN_CASE(IR_LTE,
-            STB_LANG_ARM_COMPARISON("le")
-        )
-        STB_LANG_CODEGEN_CASE(IR_GT,
-            STB_LANG_ARM_COMPARISON("gt")
-        )
-        STB_LANG_CODEGEN_CASE(IR_GTE,
-            STB_LANG_ARM_COMPARISON("ge")
-        )
-        STB_LANG_CODEGEN_CASE(IR_EQ,
-            STB_LANG_ARM_COMPARISON("eq")
-        )
-        STB_LANG_CODEGEN_CASE(IR_NEQ,
-            STB_LANG_ARM_COMPARISON("ne")
-        )
-    )
-);
 
 #define CUR_DRIVER_PREFIX lang_driver
 
 STB_LANG_NEW_DRIVER(
-    char *asm_path = "res/main.s";
-    char *obj_path = "res/main.o";
+    char *asm_path = "/tmp/main.s";
+    char *obj_path = "/tmp/main.o";
     char *exec_path = "res/main.out";
     STB_LANG_DRIVER_WRITE_DATA(asm_path);
-    STB_LANG_DRIVER_RUN_SCRIPT("clang -c %s -o %s", asm_path, obj_path);
-    STB_LANG_DRIVER_RUN_SCRIPT("clang -O0 -fno-stack-protector -fno-common -fno-exceptions -arch arm64 %s -o %s -e _main -Wl,-w -Wl,-platform_version,macos,11.0,11.0 -lc", obj_path, exec_path);
+    // STB_LANG_DRIVER_RUN_SCRIPT( "clang -O0 -arch arm64 %s -o %s -e _main -Wl,-w -Wl,-platform_version,macos,11.0,11.0 -lc", asm_path, exec_path);
+    STB_LANG_DRIVER_RUN_SCRIPT( "yasm -f macho64 %s -o %s", asm_path, obj_path);
+    STB_LANG_DRIVER_RUN_SCRIPT(
+        "ld -arch x86_64 %s -o %s -e _main -w -lSystem -syslibroot $(xcrun --show-sdk-path) -platform_version macos 11.0 11.0", 
+        obj_path, exec_path
+    );
+    STB_LANG_DRIVER_RUN_SCRIPT("rm %s %s", asm_path, obj_path);
 );
 
 int main(int argc, char **argv){
