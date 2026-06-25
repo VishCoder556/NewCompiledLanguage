@@ -1,10 +1,45 @@
 #!include "examples/include/std.lang"
 
 int main(){
-    int a = 5
-    ptr<int> pt = ref(a)
-    a = 10
-    deref(pt) = a + 5
-    printf("Hello World!\n")
-    return deref(pt);
+    int[200] current_board
+    int[200] next_board
+    
+    int i = 0;
+    while (i < 200){
+        current_board[i] = 0;
+        next_board[i] = 0
+        i = i + 1
+    }
+
+    current_board[199] = 1;
+    i = 0;
+    while (i < 40){
+        int j = 0
+        while (j < 200){
+            if (current_board[j] == 0){
+                printf(" ");
+            }else {
+                printf("*");
+            }
+            j = j + 1
+        }
+        printf("\n")
+        j = 1
+        while (j < 199){
+            int a = current_board[j - 1]
+            int b = current_board[j]
+            int c = current_board[j + 1]
+            int pattern = cast(int, (a << 2) | (b << 1) | (c << 0));
+            next_board[j] = (110 >> pattern) & 1;
+            j = j + 1
+        }
+        j = 0
+        while (j < 200){
+            current_board[j] = next_board[j]
+            j = j + 1
+        }
+        i = i + 1
+    }
+    exit(0)
+    return 0;
 }

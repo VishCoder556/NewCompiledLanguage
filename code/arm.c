@@ -85,6 +85,8 @@ STB_LANG_NEW_CODEGEN(
             );
             STB_LANG_EMIT_CODE("\tsub sp, sp, #%d\n", (offset + 15 + 16) & ~15);
         )
+        STB_LANG_CODEGEN_CASE(IR_EXTERN,
+        )
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
             STB_LANG_EMIT_CODE("\tmov sp, x29\n");
             STB_LANG_EMIT_CODE("\tldp x29, x30, [sp], #16\n");

@@ -1171,7 +1171,6 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
             return STB_LANG_IR_AS_TEMP(IR_REG, dest);
         )
         STB_LANG_IR_CASE(AST_INDEX,
-            // printf("%d, %d = %d, %d\n", typinf.type, typinf.ptrnum, ast->typeinfo.type, ast->typeinfo.ptrnum);
             STB_LANG_IR_NEW_TEMP(dest);
             STB_LANG_IR_NEW_TEMP(temp_reg);
             STB_LANG_IR_NEW_TEMP(temp2);
@@ -1217,31 +1216,33 @@ STB_LANG_ITERATE_LINKED_LIST(ast->left, _args, Lang_Parser_AST,
 #define CUR_REGALLOC_NAME Lang_RegAlloc
 #define CUR_REGALLOC_PREFIX lang_regalloc
 STB_LANG_NEW_REGALLOC(
-    // STB_LANG_REGALLOC_REGISTERS(
-    //     REG_X9, REG_X10, REG_X11, REG_X12, REG_X13, REG_X14, REG_X15
-    // ),
-    // STB_LANG_REGALLOC_REGISTER_NAMES(
-    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X9, "x9", "w9", "w9", "w9")
-    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X10, "x10", "w10", "w10", "w10")
-    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X11, "x11", "w11", "w11", "w11")
-    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X12, "x12", "w12", "w12", "w12")
-    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X13, "x13", "w13", "w13", "w13")
-    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X14, "x14", "w14", "w14", "w14")
-    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_X15, "x15", "w15", "w15", "w15")
-    //
-    // ),
     STB_LANG_REGALLOC_REGISTERS(
-        REG_R8, REG_R9, REG_R10, REG_R11
-        // Yes, r8 and r9 are technically not available as scratch registers, but we're using them as it for now for registers space
-        // TODO: distinguish callee and caller registers (in regalloc phase)
+        REG_X9, REG_X10, REG_X11, REG_X12, REG_X13, REG_X14, REG_X15
     ),
     STB_LANG_REGALLOC_REGISTER_NAMES(
-        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R8, "r8", "r8", "r8", "r8")
-        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R9, "r9", "r9", "r9", "r9")
-        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R10, "r10", "r10", "r10", "r10")
-        STB_LANG_REGALLOC_REGISTER_MATCH(REG_R11, "r11", "r11", "r11", "r11")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_X9, "x9", "w9", "w9", "w9")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_X10, "x10", "w10", "w10", "w10")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_X11, "x11", "w11", "w11", "w11")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_X12, "x12", "w12", "w12", "w12")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_X13, "x13", "w13", "w13", "w13")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_X14, "x14", "w14", "w14", "w14")
+        STB_LANG_REGALLOC_REGISTER_MATCH(REG_X15, "x15", "w15", "w15", "w15")
 
     ),
+    // STB_LANG_REGALLOC_REGISTERS(
+    //     REG_R10, REG_R11, REG_R12, REG_R13, REG_R14
+    //     // Yes, r8 and r9 are technically not available as scratch registers, but we're using them as it for now for registers space
+    //     // TODO: distinguish callee and caller registers (in regalloc phase)
+    // ),
+    // STB_LANG_REGALLOC_REGISTER_NAMES(
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_R10, "r10", "r10", "r10", "r10b")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_R11, "r11", "r11", "r11", "r11b")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_R12, "r12", "r12", "r12", "r12b")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_R13, "r13", "r13", "r13", "r13b")
+    //     STB_LANG_REGALLOC_REGISTER_MATCH(REG_R14, "r14", "r14", "r14", "r14b")
+    //
+    // ),
+    // ^ For legacy x86_64
     STB_LANG_REGALLOC_LIST(
         STB_LANG_REGALLOC_CASE(IR_EXTERN,
         )
@@ -1327,24 +1328,29 @@ STB_LANG_NEW_REGALLOC(
 
 #define CUR_CODEGEN_NAME Lang_CodeGen
 #define CUR_CODEGEN_PREFIX lang_codegen
-// #include "arm.c"
-#include "x86_64.c"
+
+
+#include "arm.c"
+
+
+// #include "x86_64.c"
+// ^ legacy x86_64
 
 
 #define CUR_DRIVER_PREFIX lang_driver
 
 STB_LANG_NEW_DRIVER(
     char *asm_path = "/tmp/main.s";
-    char *obj_path = "/tmp/main.o";
     char *exec_path = "res/main.out";
     STB_LANG_DRIVER_WRITE_DATA(asm_path);
-    // STB_LANG_DRIVER_RUN_SCRIPT( "clang -O0 -arch arm64 %s -o %s -e _main -Wl,-w -Wl,-platform_version,macos,11.0,11.0 -lc", asm_path, exec_path);
-    STB_LANG_DRIVER_RUN_SCRIPT( "yasm -f macho64 %s -o %s", asm_path, obj_path);
-    STB_LANG_DRIVER_RUN_SCRIPT(
-        "ld -arch x86_64 %s -o %s -e _main -w -lSystem -syslibroot $(xcrun --show-sdk-path) -platform_version macos 11.0 11.0", 
-        obj_path, exec_path
-    );
-    STB_LANG_DRIVER_RUN_SCRIPT("rm %s %s", asm_path, obj_path);
+    STB_LANG_DRIVER_RUN_SCRIPT( "clang -O0 -arch arm64 %s -o %s -e _main -Wl,-w -Wl,-platform_version,macos,11.0,11.0 -lc", asm_path, exec_path);
+    // STB_LANG_DRIVER_RUN_SCRIPT( "yasm -f macho64 %s -o %s", asm_path, obj_path);
+    // STB_LANG_DRIVER_RUN_SCRIPT(
+    //     "ld -arch x86_64 %s -o %s -e _main -w -lSystem -syslibroot $(xcrun --show-sdk-path) -platform_version macos 11.0 11.0", 
+    //     obj_path, exec_path
+    // );
+    // ^ for legacy x86_64
+    STB_LANG_DRIVER_RUN_SCRIPT("rm %s", asm_path);
 );
 
 int main(int argc, char **argv){
@@ -1366,11 +1372,6 @@ int main(int argc, char **argv){
     Lang_Tokenizer *tokenizer = lang_tokenizer_init(input_file);
     while (lang_tokenizer_token(tokenizer) == 0){
     }
-    // int len = tokenizer->tokens.datalen;
-    // for (int i=0; i<len; i++){
-    //     printf("%d, %s\n", tokenizer->tokens.data[i].type, tokenizer->tokens.data[i].value);
-    // }
-    
     Lang_Preprocessor *processor = lang_preprocessor_init(tokenizer, 0);
     while (lang_preprocessor_token(processor) == 0){
     }

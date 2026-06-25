@@ -1,3 +1,8 @@
+// TODO: Legacy x86_64 backend
+// DO NOT USE: use ARM64 instead
+// Deprecated code
+
+
 #define STB_LANG_X86_64_FORMAT(size) size == 4 ? "dword" : size == 1 ? "byte" : "qword"
 
 #define STB_LANG_X86_64_MOVE(size, right, ...) { \
@@ -12,7 +17,7 @@ if (right->type == IR_INT){ \
 }else if (right->type == IR_VAR){ \
     int _size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, right->value); \
     int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, right->value); \
-    STB_LANG_EMIT_CODE("\tmov %s, %s [rbp - %d]\n", leftr, STB_LANG_X86_64_FORMAT(_size), offset);\
+    STB_LANG_EMIT_CODE("\tmov %s, %s [rbp - %d]\n", leftr, STB_LANG_X86_64_FORMAT(size), offset);\
 }else if (right->type == IR_REG){ \
     if (right->value[0] == 'a'){ \
         STB_LANG_EMIT_CODE("\tmov %s, %s\n", leftr, STB_LANG_X86_64_ARGS[atoi(right->value+1)]); \
@@ -23,6 +28,7 @@ if (right->type == IR_INT){ \
     } \
 } \
 }
+
 
 #define STB_LANG_X86_64_FORMAT_STRING(str) \
 STB_LANG_EMIT_CODE("\'"); \
@@ -47,7 +53,10 @@ STB_LANG_EMIT_CODE("', 0");
 char* STB_LANG_X86_64_ARGS[] = {
     "rdi",
     "rsi",
-    "rcx"
+    "rdx",
+    "rcx",
+    "r8",
+    "r9"
 };
 
 #define STB_LANG_X86_64_BINARY(op) \
@@ -58,6 +67,18 @@ if (instr->right->type != IR_INT){ \
 }else { \
     STB_LANG_EMIT_CODE("\t%s %s, %s\n", op, STB_LANG_REGISTER(instr->dest->phys, 8), instr->right->value); \
 }
+
+
+#define STB_LANG_X86_64_COMPARISON(op) \
+STB_LANG_X86_64_MOVE(8, instr->right, STB_LANG_REGISTER(instr->dest->phys, 8)); \
+if (instr->left->type != IR_INT){ \
+    STB_LANG_X86_64_MOVE(8, instr->left, STB_LANG_REGISTER(instr->phys[0], 8)); \
+    STB_LANG_EMIT_CODE("\tcmp %s, %s\n", STB_LANG_REGISTER(instr->phys[0], 8), STB_LANG_REGISTER(instr->dest->phys, 8)); \
+}else { \
+    STB_LANG_EMIT_CODE("\tcmp %s, %s\n",  instr->left->value, STB_LANG_REGISTER(instr->dest->phys, 8)); \
+} \
+STB_LANG_EMIT_CODE("\tset%s %s\n", op, STB_LANG_REGISTER(instr->dest->phys, 1));
+
 
 
 
@@ -85,8 +106,10 @@ STB_LANG_NEW_CODEGEN(
         STB_LANG_CODEGEN_CASE(IR_FUNCDEF_BEGIN,
             STB_LANG_EMIT_CODE("_%s:\n", instr->dest->value);
             STB_LANG_EMIT_CODE("\tpush rbp\n");
+            // STB_LANG_EMIT_CODE("\tpush r12\n");
+            // STB_LANG_EMIT_CODE("\tpush r13\n");
+            // STB_LANG_EMIT_CODE("\tpush r14\n");
             STB_LANG_EMIT_CODE("\tmov rbp, rsp\n");
-
 
             int offset = 16;
             STB_LANG_GO_TO_FUNC(instr->dest->value);
@@ -96,6 +119,23 @@ STB_LANG_NEW_CODEGEN(
                 };
             );
             STB_LANG_EMIT_CODE("\tsub rsp, %d\n", (offset + 15 + 16) & ~15);
+        )
+        STB_LANG_CODEGEN_CASE(IR_RET,
+            STB_LANG_X86_64_MOVE(8, instr->left, "rax");
+            STB_LANG_EMIT_CODE("\tmov rsp, rbp\n");
+            // STB_LANG_EMIT_CODE("\tpop r14\n");
+            // STB_LANG_EMIT_CODE("\tpop r13\n");
+            // STB_LANG_EMIT_CODE("\tpop r12\n");
+            STB_LANG_EMIT_CODE("\tpop rbp\n");
+            STB_LANG_EMIT_CODE("\tret\n");
+        )
+        STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
+            STB_LANG_EMIT_CODE("\tmov rsp, rbp\n");
+            // STB_LANG_EMIT_CODE("\tpop r14\n");
+            // STB_LANG_EMIT_CODE("\tpop r13\n");
+            // STB_LANG_EMIT_CODE("\tpop r12\n");
+            STB_LANG_EMIT_CODE("\tpop rbp\n");
+            STB_LANG_EMIT_CODE("\tret\n");
         )
         STB_LANG_CODEGEN_CASE(IR_CALL,
             STB_LANG_EMIT_CODE("\tcall _%s\n", instr->dest->value);
@@ -109,6 +149,40 @@ STB_LANG_NEW_CODEGEN(
         STB_LANG_CODEGEN_CASE(IR_MUL,
             STB_LANG_X86_64_BINARY("imul");
         )
+        STB_LANG_CODEGEN_CASE(IR_BSHL,
+            STB_LANG_X86_64_MOVE(8, instr->left, STB_LANG_REGISTER(instr->dest->phys, 8));
+            STB_LANG_X86_64_MOVE(1, instr->right, "cl");
+            STB_LANG_EMIT_CODE("\tshl %s, cl\n", STB_LANG_REGISTER(instr->dest->phys, 8));
+        )
+        STB_LANG_CODEGEN_CASE(IR_BSHR,
+            STB_LANG_X86_64_MOVE(8, instr->left, STB_LANG_REGISTER(instr->dest->phys, 8));
+            STB_LANG_X86_64_MOVE(1, instr->right, "cl");
+            STB_LANG_EMIT_CODE("\tshr %s, cl\n", STB_LANG_REGISTER(instr->dest->phys, 8));
+        )
+        STB_LANG_CODEGEN_CASE(IR_BOR,
+            STB_LANG_X86_64_BINARY("or");
+        )
+        STB_LANG_CODEGEN_CASE(IR_BAND,
+            STB_LANG_X86_64_BINARY("and");
+        )
+        STB_LANG_CODEGEN_CASE(IR_LT,
+            STB_LANG_X86_64_COMPARISON("l");
+        )
+        STB_LANG_CODEGEN_CASE(IR_LTE,
+            STB_LANG_X86_64_COMPARISON("le");
+        )
+        STB_LANG_CODEGEN_CASE(IR_GT,
+            STB_LANG_X86_64_COMPARISON("l");
+        )
+        STB_LANG_CODEGEN_CASE(IR_GTE,
+            STB_LANG_X86_64_COMPARISON("le");
+        )
+        STB_LANG_CODEGEN_CASE(IR_EQ,
+            STB_LANG_X86_64_COMPARISON("e");
+        )
+        STB_LANG_CODEGEN_CASE(IR_NEQ,
+            STB_LANG_X86_64_COMPARISON("ne");
+        )
         STB_LANG_CODEGEN_CASE(IR_ADDR,
             char *dest = STB_LANG_REGISTER(instr->dest->phys, 8);
             if (instr->left->type == IR_VAR){
@@ -121,7 +195,7 @@ STB_LANG_NEW_CODEGEN(
             int _size = STB_LANG_LOOKUP_SIZE(gen->root_scope, &instr->typeinfo);
 
             char *val_reg = STB_LANG_REGISTER(instr->phys[0], _size);
-            STB_LANG_X86_64_MOVE(size, instr->left, val_reg);
+            STB_LANG_X86_64_MOVE(_size, instr->left, val_reg);
 
             char *addr_reg = STB_LANG_REGISTER(instr->dest->phys, 8);
             STB_LANG_X86_64_MOVE(8, instr->dest, addr_reg);
@@ -130,7 +204,7 @@ STB_LANG_NEW_CODEGEN(
         )
         STB_LANG_CODEGEN_CASE(IR_LOAD,
             char *val_reg = STB_LANG_REGISTER(instr->phys[0], 8);
-            STB_LANG_X86_64_MOVE(size, instr->left, val_reg);
+            STB_LANG_X86_64_MOVE(_size, instr->left, val_reg);
 
             char *entr_reg = STB_LANG_REGISTER(instr->dest->phys, 8);
             STB_LANG_X86_64_MOVE(8, instr->dest, entr_reg);
@@ -155,16 +229,20 @@ STB_LANG_NEW_CODEGEN(
             }
 
         )
-        STB_LANG_CODEGEN_CASE(IR_RET,
-            STB_LANG_X86_64_MOVE(8, instr->left, "rax");
-            STB_LANG_EMIT_CODE("\tmov rsp, rbp\n");
-            STB_LANG_EMIT_CODE("\tpop rbp\n");
-            STB_LANG_EMIT_CODE("\tret\n");
+
+        STB_LANG_CODEGEN_CASE(IR_LABEL,
+            STB_LANG_EMIT_CODE(".L_label_%s:\n", instr->dest->value)
         )
-        STB_LANG_CODEGEN_CASE(IR_FUNCDEF_END,
-            STB_LANG_EMIT_CODE("\tmov rsp, rbp\n");
-            STB_LANG_EMIT_CODE("\tpop rbp\n");
-            STB_LANG_EMIT_CODE("\tret\n");
+        STB_LANG_CODEGEN_CASE(IR_JUMP_IF_FALSE,
+            STB_LANG_EMIT_CODE("\ttest %s, %s\n", STB_LANG_REGISTER(instr->right->phys, 8), STB_LANG_REGISTER(instr->right->phys, 8));
+            STB_LANG_EMIT_CODE("\tjz .L_label_%s\n", 
+                instr->dest->value
+            );
+        )
+        STB_LANG_CODEGEN_CASE(IR_JUMP,
+            STB_LANG_EMIT_CODE("\tjmp .L_label_%s\n", 
+                instr->dest->value
+            );
         )
     )
 )
