@@ -1,4 +1,4 @@
-// This piece of code can tokenize itself
+// This piece of code tokenizes itself
 #!include "examples/include/std.lang"
 
 

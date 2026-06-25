@@ -72,10 +72,10 @@ typedef struct { \
 }CUR_REGALLOC_NAME; \
 STB_CONCAT(CUR_REGALLOC_NAME, _Reg) STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(CUR_REGALLOC_NAME *regalloc, int offset, int file){ \
     STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register) *dym = regalloc->regs; \
-    for (int i=0; i<dym->datalen; i++){ \
-        if (dym->data[i].available == 1){ \
-            dym->data[i].available = 0; \
-            return (STB_CONCAT(CUR_REGALLOC_NAME, _Reg))i; \
+    for (int v=0; v<dym->datalen; v++){ \
+        if (dym->data[v].available == 1){ \
+            dym->data[v].available = 0; \
+            return (STB_CONCAT(CUR_REGALLOC_NAME, _Reg))v; \
         } \
     } \
     return -1; \
@@ -87,7 +87,7 @@ char *STB_CONCAT(CUR_REGALLOC_PREFIX, _register_from_reg_inner)(STB_CONCAT(CUR_R
 char *STB_CONCAT(CUR_REGALLOC_PREFIX, _register_from_reg)(STB_CONCAT3(dymarray_, CUR_TOKENIZER_NAME, _File) files, int fl, int offset, STB_CONCAT(CUR_REGALLOC_NAME, _Reg) r, int size){ \
     char *str = STB_CONCAT(CUR_REGALLOC_PREFIX, _register_from_reg_inner)(r, size); \
     if (str == NULL){ \
-        STB_LANG_REGALLOC_ERROR_MINOR(files, offset, fl, "RegisterError", "Invalid register or size accessed"); \
+        STB_LANG_REGALLOC_ERROR_MINOR(files, offset, fl, "RegisterError", "Invalid register or size accessed (reg=%d, size=%d)", r, size); \
         return NULL; \
     } \
     return str; \
@@ -101,7 +101,9 @@ STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register) *STB_CONCAT(CUR_REGALLOC_PR
     return dym;\
 }\
 void STB_CONCAT(CUR_REGALLOC_PREFIX, _free_register)(STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg, STB_CONCAT3(dymarray_, CUR_REGALLOC_NAME, _Register) *regs){ \
-    regs->data[(int)reg].available = 1; \
+    if (reg != -1) { \
+        regs->data[(int)reg].available = 1; \
+    } \
 }; \
 STB_CONCAT(CUR_REGALLOC_NAME, _VirtualRegister) STB_CONCAT(CUR_REGALLOC_PREFIX, _virtual_reg_init)(CUR_REGALLOC_NAME *regalloc, char *virtual, STB_CONCAT(CUR_IR_NAME, _Instr) *instr){ \
     STB_CONCAT(CUR_REGALLOC_NAME, _VirtualRegister) vreg; \
@@ -227,7 +229,8 @@ STB_LANG_REGALLOC_REGISTER_NAMES( \
 //     };
 // );
 
-#define STB_LANG_ALLOC_REGISTER(reg) STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg; \
+#define STB_LANG_ALLOC_REGISTER(reg)  \
+STB_CONCAT(CUR_REGALLOC_NAME, _Reg) reg; \
 if (instr == NULL){ \
     reg = STB_CONCAT(CUR_REGALLOC_PREFIX, _alloc_register)(regalloc, -1, -1); \
     if (reg == -1){ \

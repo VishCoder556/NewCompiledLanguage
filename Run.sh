@@ -1,4 +1,4 @@
 gcc code/main.c -o exes/main
 ./exes/main examples/a.lang
-./res/main.out
+./res/main.out examples/a.lang
 echo "Returned" $?

@@ -1,4 +1,4 @@
-// This piece of code can tokenize itself
+// This piece of code tokenizes itself
 #!include "examples/include/std.lang"
 
 
@@ -334,7 +334,6 @@ int main(int argc, ptr<string> argv){
         input_file = argv[i]
         i = i + 1
     }
-    input_file = "tests/inputs/tokenizer.lang" // Tokenize itself
     struct Tokenizer tokenizer
     tokenizer.file_name = input_file
     ptr<int> file = fopen(input_file, "r")

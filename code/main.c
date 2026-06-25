@@ -736,7 +736,7 @@ STB_LANG_NEW_TYPEINFO(
         STB_LANG_TYPEINFO_6CASES(AST_LT, AST_LTE, AST_GT, AST_GTE, AST_EQ, AST_NEQ,
             STB_LANG_EXPAND_LHS();
             STB_LANG_EXPAND_RHS();
-            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_RHS(ast)->typeinfo);
+            STB_LANG_TYPEINFO_ASSUME_TYPE(STB_LANG_LHS(ast)->typeinfo);
             STB_LANG_EXPECT_TYPE_EQ(ast, STB_LANG_RHS(ast));
         )
         STB_LANG_TYPEINFO_5CASES(AST_ADD, AST_SUB, AST_MUL, AST_DIV, AST_MODULO,
@@ -1247,6 +1247,9 @@ STB_LANG_NEW_REGALLOC(
         STB_LANG_REGALLOC_CASE(IR_EXTERN,
         )
         STB_LANG_REGALLOC_CASE(IR_FUNCDEF_BEGIN,
+            for (int i=0; i<regalloc->regs->datalen; i++){
+                regalloc->regs->data[i].available = 1;
+            }
         )
         STB_LANG_REGALLOC_CASE(IR_FUNCDEF_END,
         )
@@ -1277,7 +1280,7 @@ STB_LANG_NEW_REGALLOC(
                 }else {
                     STB_LANG_REGALLOC_NEGATE(phys[1]);
                 };
-            });
+            })
         )
         STB_LANG_REGALLOC_6CASES(IR_MUL, IR_DIV, IR_BOR, IR_BAND, IR_AND, IR_OR,
             STB_LANG_SAVE_REG(phys[0], {

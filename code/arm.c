@@ -47,7 +47,7 @@ if (instr->phys[1] != -1){ \
 int size = STB_LANG_LOOKUP_SIZE(gen->root_scope, &instr->typeinfo); \
 STB_LANG_ARM_MOVE(size, instr->left, STB_LANG_REGISTER(instr->phys[0], size)); \
 if (instr->phys[1] != -1){ \
-    STB_LANG_ARM_MOVE(8, instr->right, STB_LANG_REGISTER(instr->phys[1], size)); \
+    STB_LANG_ARM_MOVE(size, instr->right, STB_LANG_REGISTER(instr->phys[1], size)); \
     STB_LANG_EMIT_CODE("\tcmp %s, %s\n", STB_LANG_REGISTER(instr->phys[0], size), STB_LANG_REGISTER(instr->phys[1], size)); \
 }else { \
     STB_LANG_EMIT_CODE("\tcmp %s, #%s\n", STB_LANG_REGISTER(instr->phys[0], size), instr->right->value); \
@@ -147,7 +147,6 @@ STB_LANG_NEW_CODEGEN(
             ;if (instr->dest->type == IR_VAR){
                 int size = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_size_from_var)(gen, instr->dest->value);
                 int offset = STB_CONCAT(CUR_CODEGEN_PREFIX, _get_offset_from_var)(gen, instr->dest->value);
-
                 if (instr->left != NULL){
                     STB_LANG_ARM_MOVE(size, instr->left, STB_LANG_REGISTER(instr->phys[0], size))
                 }
